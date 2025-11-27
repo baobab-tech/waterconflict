@@ -62,7 +62,8 @@ def generate_model_card(model_repo: str,
                        full_train_size: Optional[int] = None,
                        num_iterations: int = 20,
                        sampling_strategy: str = "oversampling",
-                       evals_repo: Optional[str] = None) -> str:
+                       evals_repo: Optional[str] = None,
+                       training_dataset_repo: Optional[str] = None) -> str:
     """
     Generate comprehensive model card with evaluation results.
     
@@ -80,6 +81,7 @@ def generate_model_card(model_repo: str,
         num_iterations: Number of contrastive pair iterations
         sampling_strategy: Training sampling strategy
         evals_repo: Optional HF evals dataset repo ID for experiment tracking
+        training_dataset_repo: Optional HF dataset repo ID for versioned training data
         
     Returns:
         Model card markdown string
@@ -274,6 +276,12 @@ Evaluated on a held-out test set of {test_size} samples ({test_split*100:.0f}% o
 - **Epochs**: {num_epochs}
 - **Iterations**: {num_iterations} (contrastive pair generation)
 - **Sampling strategy**: {sampling_strategy} (balances positive/negative pairs)
+"""
+    
+    # Add training dataset link if provided
+    if training_dataset_repo:
+        model_card += f"""- **Training Dataset**: [{training_dataset_repo}](https://huggingface.co/datasets/{training_dataset_repo}) - Exact sampled data used for this model version
+
 """
     
     # Add experiment tracking section if evals repo is provided

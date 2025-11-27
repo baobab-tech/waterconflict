@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # /// script
 # dependencies = [
-#     "water-conflict-classifier>=0.1.11",
+#     "water-conflict-classifier>=0.1.12",
 #     # For development/testing before PyPI publish, use:
 #     # "water-conflict-classifier @ git+https://github.com/yourusername/waterconflict.git#subdirectory=classifier",
 # ]
@@ -51,6 +51,7 @@ from evaluation import evaluate_model, print_evaluation_results
 from model_card import generate_model_card
 from versioning import ExperimentTracker, create_hf_version_tag, get_next_version
 from evals_upload import upload_eval_results
+from huggingface_hub import create_repo
 
 # ============================================================================
 # CONFIGURATION
@@ -58,7 +59,7 @@ from evals_upload import upload_eval_results
 
 HF_ORGANIZATION = os.environ.get("HF_ORGANIZATION")
 DATASET_REPO_NAME = os.environ.get("DATASET_REPO_NAME", "water-conflict-training-data")
-MODEL_REPO_NAME = os.environ.get("MODEL_REPO_NAME", "water-conflict-classifier-modernbert")
+MODEL_REPO_NAME = os.environ.get("MODEL_REPO_NAME", "water-conflict-classifier-minilm")
 EVALS_REPO_NAME = os.environ.get("EVALS_REPO_NAME", "water-conflict-classifier-evals")
 
 if not HF_ORGANIZATION:
@@ -71,7 +72,7 @@ MODEL_REPO = f"{HF_ORGANIZATION}/{MODEL_REPO_NAME}"
 EVALS_REPO = f"{HF_ORGANIZATION}/{EVALS_REPO_NAME}"
 
 # Training configuration
-BASE_MODEL = "modernbert-embed-base" # "BAAI/bge-small-en-v1.5"
+BASE_MODEL = "sentence-transformers/all-MiniLM-L6-v2" # "BAAI/bge-small-en-v1.5"
 USE_SAMPLE_TRAINING = True
 SAMPLE_SIZE = 1200  # Increased for better label representation, especially Weapon
 MIN_SAMPLES_PER_LABEL = 100  # Ensure each label gets sufficient training examples (especially Weapon ~292 available)
@@ -84,6 +85,132 @@ TEST_SIZE = 0.15
 VERSION = os.environ.get("MODEL_VERSION")  # Optional: set explicit version
 AUTO_VERSION = VERSION is None  # Auto-increment if not specified
 EXPERIMENT_HISTORY_FILE = "experiment_history.jsonl"
+
+# ============================================================================
+# DATASET UPLOAD
+# ============================================================================
+
+def upload_training_dataset(train_data: pd.DataFrame, 
+                            test_data: pd.DataFrame,
+                            version: str,
+                            base_dataset_repo: str,
+                            sampling_config: dict) -> str:
+    """
+    Upload the actual sampled training dataset to HF Hub.
+    
+    Creates a versioned dataset showing exactly what data was used for training.
+    
+    Args:
+        train_data: Training split DataFrame
+        test_data: Test split DataFrame
+        version: Model version (e.g. "0.1.0")
+        base_dataset_repo: Original dataset repo (e.g. "org/water-conflict-training-data")
+        sampling_config: Dict with sampling parameters
+        
+    Returns:
+        Repository ID of uploaded dataset
+    """
+    # Create versioned dataset repo name
+    org = base_dataset_repo.split('/')[0]
+    base_name = base_dataset_repo.split('/')[1]
+    versioned_repo = f"{org}/{base_name}-v{version}"
+    
+    print(f"  Uploading to: {versioned_repo}")
+    
+    # Create dataset repo
+    try:
+        create_repo(
+            repo_id=versioned_repo,
+            repo_type="dataset",
+            exist_ok=True,
+            private=False
+        )
+    except Exception as e:
+        print(f"  Note: {e}")
+    
+    # Upload train and test CSVs
+    api = HfApi()
+    
+    # Save locally first
+    train_path = "/tmp/train_sampled.csv"
+    test_path = "/tmp/test_sampled.csv"
+    train_data.to_csv(train_path, index=False)
+    test_data.to_csv(test_path, index=False)
+    
+    api.upload_file(
+        path_or_fileobj=train_path,
+        path_in_repo="train.csv",
+        repo_id=versioned_repo,
+        repo_type="dataset",
+    )
+    
+    api.upload_file(
+        path_or_fileobj=test_path,
+        path_in_repo="test.csv",
+        repo_id=versioned_repo,
+        repo_type="dataset",
+    )
+    
+    # Create dataset card
+    dataset_card = f"""---
+tags:
+- water-conflict
+- setfit
+- training-data
+license: cc-by-nc-4.0
+---
+
+# Water Conflict Training Dataset - v{version}
+
+This dataset contains the **actual sampled data** used to train model version `{version}`.
+
+## Dataset Details
+
+- **Parent Dataset**: [{base_dataset_repo}](https://huggingface.co/datasets/{base_dataset_repo})
+- **Model Version**: {version}
+- **Train Samples**: {len(train_data)}
+- **Test Samples**: {len(test_data)}
+
+## Sampling Configuration
+
+```python
+{sampling_config}
+```
+
+## Splits
+
+- `train.csv`: Training samples (stratified sample from parent dataset)
+- `test.csv`: Test samples (held-out evaluation set)
+
+## Labels
+
+Multi-label classification with labels: {LABEL_NAMES}
+
+## Usage
+
+```python
+from datasets import load_dataset
+
+dataset = load_dataset("{versioned_repo}")
+train = dataset['train']
+test = dataset['test']
+```
+
+## Reproducibility
+
+This dataset represents the exact data used to train the model, ensuring full reproducibility.
+Parent dataset was sampled using stratified sampling to ensure balanced label representation.
+"""
+    
+    api.upload_file(
+        path_or_fileobj=dataset_card.encode(),
+        path_in_repo="README.md",
+        repo_id=versioned_repo,
+        repo_type="dataset",
+    )
+    
+    print(f"  ✓ Dataset uploaded: https://huggingface.co/datasets/{versioned_repo}")
+    return versioned_repo
 
 # ============================================================================
 # AUTHENTICATION
@@ -166,6 +293,36 @@ def main():
     print(f"  ✓ Final training set: {len(train_data)} examples")
     print(f"  ✓ Final test set: {len(test_data)} examples")
     
+    # Step 4.5: Determine version and upload training dataset
+    print(f"\n[4.5/10] Determining version and uploading training dataset...")
+    
+    # Determine version first so we can version the dataset
+    if AUTO_VERSION:
+        version = get_next_version(EXPERIMENT_HISTORY_FILE)
+        print(f"  Auto-generated version: {version}")
+    else:
+        version = VERSION
+        print(f"  Using specified version: {version}")
+    
+    # Upload the actual training dataset with version
+    sampling_config = {
+        "sample_size": SAMPLE_SIZE if USE_SAMPLE_TRAINING else None,
+        "min_samples_per_label": MIN_SAMPLES_PER_LABEL,
+        "stratified": True,
+        "test_split": TEST_SIZE,
+        "full_train_pool": len(full_train),
+        "train_samples_used": len(train_data),
+        "test_samples": len(test_data)
+    }
+    
+    training_dataset_repo = upload_training_dataset(
+        train_data=train_data,
+        test_data=test_data,
+        version=version,
+        base_dataset_repo=DATASET_REPO,
+        sampling_config=sampling_config
+    )
+    
     # Convert to HF Dataset format
     train_df = train_data[['text', 'labels']]
     test_df = test_data[['text', 'labels']]
@@ -173,7 +330,7 @@ def main():
     test_dataset = Dataset.from_pandas(test_df)  # type: ignore
     
     # Step 5: Train
-    print(f"\n[5/8] Training model...")
+    print(f"\n[5/10] Training model...")
     print(f"  (Estimated time: ~2-5 minutes on A10G GPU with sampled data)\n")
     
     model_card_data = SetFitModelCardData(
@@ -194,7 +351,7 @@ def main():
     )
     
     # Step 6: Evaluate
-    print("\n[6/8] Evaluating model...")
+    print("\n[6/10] Evaluating model...")
     
     eval_results = evaluate_model(
         model=model,
@@ -206,7 +363,7 @@ def main():
     print_evaluation_results(eval_results, LABEL_NAMES)
     
     # Step 7: Generate model card
-    print("\n[7/8] Generating model card...")
+    print("\n[7/10] Generating model card...")
     
     model_card = generate_model_card(
         model_repo=MODEL_REPO,
@@ -221,13 +378,14 @@ def main():
         full_train_size=len(full_train),
         num_iterations=NUM_ITERATIONS,
         sampling_strategy="undersampling",
-        evals_repo=EVALS_REPO
+        evals_repo=EVALS_REPO,
+        training_dataset_repo=training_dataset_repo
     )
     
     print("  ✓ Model card generated")
     
     # Step 8: Push to Hub
-    print("\n[8/8] Pushing model to Hugging Face Hub...")
+    print("\n[8/10] Pushing model to Hugging Face Hub...")
     print(f"  Target repository: {MODEL_REPO}")
     
     try:
@@ -249,14 +407,7 @@ def main():
         
         # Version tagging & experiment tracking
         print("\n[9/10] Logging experiment & creating version tag...")
-        
-        # Determine version
-        if AUTO_VERSION:
-            version = get_next_version(EXPERIMENT_HISTORY_FILE)
-            print(f"  Auto-generated version: {version}")
-        else:
-            version = VERSION
-            print(f"  Using specified version: {version}")
+        print(f"  Using version: {version}")
         
         # Log experiment to local history
         tracker = ExperimentTracker(EXPERIMENT_HISTORY_FILE)
@@ -277,6 +428,7 @@ def main():
             metadata={
                 "model_repo": MODEL_REPO,
                 "dataset_repo": DATASET_REPO,
+                "training_dataset_repo": training_dataset_repo,
             }
         )
         print(f"  ✓ Logged to {EXPERIMENT_HISTORY_FILE}")
@@ -299,6 +451,7 @@ def main():
             metadata={
                 "model_repo": MODEL_REPO,
                 "dataset_repo": DATASET_REPO,
+                "training_dataset_repo": training_dataset_repo,
             }
         )
         
