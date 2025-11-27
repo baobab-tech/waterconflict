@@ -14,6 +14,7 @@ def train_model(train_dataset: Dataset,
                 label_names: list[str] = None,
                 batch_size: int = 16,
                 num_epochs: int = 3,
+                num_iterations: int = 20,
                 sampling_strategy: str = "oversampling",
                 model_card_data: SetFitModelCardData = None) -> SetFitModel:
     """
@@ -26,6 +27,7 @@ def train_model(train_dataset: Dataset,
         label_names: List of label names (e.g. ['Trigger', 'Casualty', 'Weapon'])
         batch_size: Training batch size
         num_epochs: Number of training epochs
+        num_iterations: Number of text pairs to generate for contrastive learning (default 20, reduce for larger datasets)
         sampling_strategy: 'oversampling' or 'undersampling'
         model_card_data: Optional SetFitModelCardData for model card metadata
         
@@ -52,11 +54,13 @@ def train_model(train_dataset: Dataset,
     print(f"\n  Training configuration:")
     print(f"  Batch size: {batch_size}")
     print(f"  Epochs: {num_epochs}")
+    print(f"  Iterations (contrastive pairs): {num_iterations}")
     print(f"  Sampling strategy: {sampling_strategy}")
     
     args = TrainingArguments(
         batch_size=batch_size,
         num_epochs=num_epochs,
+        num_iterations=num_iterations,
         eval_strategy="epoch",
         save_strategy="epoch",
         load_best_model_at_end=True,

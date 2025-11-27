@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # /// script
 # dependencies = [
-#     "water-conflict-classifier>=0.1.5",
+#     "water-conflict-classifier>=0.1.7",
 #     # For development/testing before PyPI publish, use:
 #     # "water-conflict-classifier @ git+https://github.com/yourusername/waterconflict.git#subdirectory=classifier",
 # ]
@@ -70,10 +70,11 @@ MODEL_REPO = f"{HF_ORGANIZATION}/{MODEL_REPO_NAME}"
 # Training configuration
 BASE_MODEL = "BAAI/bge-small-en-v1.5"
 USE_SAMPLE_TRAINING = True
-SAMPLE_SIZE = 1200  # Increased for better label representation, especially Weapon
-MIN_SAMPLES_PER_LABEL = 150  # Ensure each label gets sufficient training examples
-BATCH_SIZE = 32
-NUM_EPOCHS = 1
+SAMPLE_SIZE = 1500  # Increased for better label representation, especially Weapon
+MIN_SAMPLES_PER_LABEL = 250  # Ensure each label gets sufficient training examples (especially Weapon ~292 available)
+BATCH_SIZE = 64  # Increased for faster training with larger dataset
+NUM_EPOCHS = 1  # SetFit best practice: <1 epoch with more data
+NUM_ITERATIONS = 10  # Reduced from default 20 (SetFit generates contrastive pairs, less needed with more data)
 TEST_SIZE = 0.15
 
 # Versioning configuration
@@ -184,6 +185,7 @@ def main():
         label_names=LABEL_NAMES,
         batch_size=BATCH_SIZE,
         num_epochs=NUM_EPOCHS,
+        num_iterations=NUM_ITERATIONS,
         sampling_strategy="undersampling",
         model_card_data=model_card_data
     )
@@ -214,6 +216,7 @@ def main():
         num_epochs=NUM_EPOCHS,
         test_split=TEST_SIZE,
         full_train_size=len(full_train),
+        num_iterations=NUM_ITERATIONS,
         sampling_strategy="undersampling"
     )
     

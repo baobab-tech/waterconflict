@@ -15,6 +15,7 @@ def generate_model_card(model_repo: str,
                        num_epochs: int,
                        test_split: float,
                        full_train_size: int = None,
+                       num_iterations: int = 20,
                        sampling_strategy: str = "oversampling") -> str:
     """
     Generate comprehensive model card with evaluation results.
@@ -30,6 +31,7 @@ def generate_model_card(model_repo: str,
         num_epochs: Number of training epochs
         test_split: Test set proportion (e.g. 0.15)
         full_train_size: Original training pool size (before sampling)
+        num_iterations: Number of contrastive pair iterations
         sampling_strategy: Training sampling strategy
         
     Returns:
@@ -220,6 +222,7 @@ Evaluated on a held-out test set of {test_size} samples ({test_split*100:.0f}% o
 - **Base model**: {base_model} (33.4M params)
 - **Batch size**: {batch_size}
 - **Epochs**: {num_epochs}
+- **Iterations**: {num_iterations} (contrastive pair generation)
 - **Sampling strategy**: {sampling_strategy} (balances positive/negative pairs)
 
 ## 📊 Data Sources

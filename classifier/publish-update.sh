@@ -4,12 +4,19 @@ set -e
 echo "🚀 Publishing water-conflict-classifier update"
 echo "=============================================="
 
-# Get current version
-CURRENT_VERSION=$(grep -E '^version = ' pyproject.toml | sed -E 's/version = "(.*)"/\1/')
-echo "📦 Current version: $CURRENT_VERSION"
+# Get latest version from PyPI
+echo "🔍 Fetching latest version from PyPI..."
+PYPI_VERSION=$(curl -s https://pypi.org/pypi/water-conflict-classifier/json | python3 -c "import sys, json; print(json.load(sys.stdin)['info']['version'])")
+
+if [ -z "$PYPI_VERSION" ]; then
+    echo "❌ Failed to fetch version from PyPI"
+    exit 1
+fi
+
+echo "📦 Latest PyPI version: $PYPI_VERSION"
 
 # Auto-increment patch version (e.g., 0.1.1 -> 0.1.2)
-IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
+IFS='.' read -ra VERSION_PARTS <<< "$PYPI_VERSION"
 MAJOR="${VERSION_PARTS[0]}"
 MINOR="${VERSION_PARTS[1]}"
 PATCH="${VERSION_PARTS[2]}"
