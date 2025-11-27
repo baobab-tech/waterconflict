@@ -166,15 +166,12 @@ def generate_hard_negatives_csv(output_path: str = "../data/hard_negatives.csv")
     print(f"\n✓ Generated {len(HARD_NEGATIVES)} hard negative examples")
     print(f"✓ Saved to: {output_file.absolute()}")
     print(f"\nThese examples are water-related but NON-conflict headlines.")
-    print(f"They should be merged with your existing negatives.csv for retraining.")
-    print("\nNext steps:")
+    print(f"They prevent the model from learning 'water = conflict'")
+    print(f"\nNext steps:")
     print("  1. Review the generated hard negatives")
-    print("  2. Merge with existing negatives.csv:")
-    print("     - Read both CSVs")
-    print("     - Concatenate dataframes")
-    print("     - Save combined negatives.csv")
-    print("  3. Retrain the model with updated dataset")
-    print("  4. Re-evaluate with your classify.py test cases")
+    print("  2. Run merge (below) to create training-ready negatives.csv")
+    print("  3. Upload to HF Hub with upload_datasets.py")
+    print("  4. Retrain the model")
     print("=" * 80)
     
     return df
@@ -182,17 +179,23 @@ def generate_hard_negatives_csv(output_path: str = "../data/hard_negatives.csv")
 
 def merge_with_existing_negatives(hard_negatives_path: str = "../data/hard_negatives.csv",
                                   existing_negatives_path: str = "../data/negatives.csv",
-                                  output_path: str = "../data/negatives_updated.csv"):
+                                  output_path: str = "../data/negatives_updated.csv",
+                                  max_acled_samples: int = 600):
     """
-    Merge hard negatives with existing negatives dataset.
+    Merge hard negatives with sampled existing negatives to create training-ready dataset.
+    
+    This creates a balanced negatives dataset that includes:
+    - ALL hard negatives (water-related, peaceful) - these are critical for preventing false positives
+    - A sampled subset of ACLED negatives (general conflict news without water)
     
     Args:
         hard_negatives_path: Path to hard negatives CSV
-        existing_negatives_path: Path to existing negatives CSV
+        existing_negatives_path: Path to existing negatives CSV (will be sampled down)
         output_path: Path to save merged negatives CSV
+        max_acled_samples: Maximum number of ACLED negatives to include (default: 600)
     """
     print("\n" + "=" * 80)
-    print("Merging Hard Negatives with Existing Negatives")
+    print("Creating Training-Ready Negatives Dataset")
     print("=" * 80)
     
     # Load both datasets
@@ -202,8 +205,19 @@ def merge_with_existing_negatives(hard_negatives_path: str = "../data/hard_negat
     print(f"\n✓ Loaded {len(hard_neg)} hard negatives (water-related, peaceful)")
     print(f"✓ Loaded {len(existing_neg)} existing negatives (general conflicts)")
     
-    # Merge
-    merged = pd.concat([existing_neg, hard_neg], ignore_index=True)
+    # Add priority_sample column to identify hard negatives
+    hard_neg['priority_sample'] = True
+    existing_neg['priority_sample'] = False
+    
+    # Sample down ACLED negatives to manageable size (we don't need all 2500+)
+    if len(existing_neg) > max_acled_samples:
+        print(f"\n  Sampling {max_acled_samples} ACLED negatives (from {len(existing_neg)} available)")
+        existing_neg_sampled = existing_neg.sample(n=max_acled_samples, random_state=42)
+    else:
+        existing_neg_sampled = existing_neg
+    
+    # Merge: ALL hard negatives + sampled ACLED negatives
+    merged = pd.concat([existing_neg_sampled, hard_neg], ignore_index=True)
     
     # Remove duplicates if any
     original_count = len(merged)
@@ -211,20 +225,25 @@ def merge_with_existing_negatives(hard_negatives_path: str = "../data/hard_negat
     duplicates_removed = original_count - len(merged)
     
     if duplicates_removed > 0:
-        print(f"✓ Removed {duplicates_removed} duplicate headlines")
+        print(f"  ✓ Removed {duplicates_removed} duplicate headlines")
     
-    # Shuffle
+    # Shuffle (but keep priority_sample column)
     merged = merged.sample(frac=1, random_state=42).reset_index(drop=True)
     
     # Save
     output_file = Path(output_path)
     merged.to_csv(output_file, index=False)
     
-    print(f"\n✓ Merged dataset: {len(merged)} total negatives")
-    print(f"  - Existing (general conflicts): {len(existing_neg)}")
-    print(f"  - Hard negatives (peaceful water): {len(hard_neg)}")
-    print(f"✓ Saved to: {output_file.absolute()}")
-    print("\n⚠️  Review the merged file, then replace your negatives.csv with it")
+    priority_count = merged['priority_sample'].sum()
+    acled_count = len(merged) - priority_count
+    
+    print(f"\n✓ Training-ready negatives dataset: {len(merged)} total")
+    print(f"  - ACLED negatives (general conflicts): {acled_count}")
+    print(f"  - Hard negatives (peaceful water): {int(priority_count)} [ALL INCLUDED]")
+    print(f"\n  Hard negatives are {priority_count/len(merged)*100:.1f}% of dataset")
+    print(f"  (Previously would have been only ~3.5% if using full 2500 ACLED negatives)")
+    print(f"\n✓ Saved to: {output_file.absolute()}")
+    print("\n💡 This dataset is optimized for training - no complex sampling needed!")
     print("=" * 80)
     
     return merged

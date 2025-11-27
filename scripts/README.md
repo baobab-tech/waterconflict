@@ -98,10 +98,12 @@ python transform_prep_negatives.py
 **Requirements:** 
 - ACLED data must be in `../data/` folder
 
+**Note:** This creates the base ACLED negatives pool. Run `generate_hard_negatives.py` after this to create the final training-ready dataset with hard negatives included.
+
 ---
 
 ### `generate_hard_negatives.py`
-Generate synthetic "hard negatives" - peaceful water-related news to prevent false positives.
+Generate "hard negatives" - peaceful water-related news to prevent false positives.
 
 **Usage:**
 ```bash
@@ -112,9 +114,16 @@ python generate_hard_negatives.py
 **What it does:**
 - Generates ~120 peaceful water-related headlines (infrastructure, research, conservation)
 - Creates `../data/hard_negatives.csv`
-- Optionally merges with existing `negatives.csv`
+- Merges with ACLED negatives to create training-ready `negatives_updated.csv`
+- Tags hard negatives with `priority_sample=True` to ensure they're always included
+- Samples down ACLED negatives to ~600 (since we don't need all 2500+)
 
 **Why needed:** Without hard negatives, the model learns "water = conflict" instead of "water + violence = conflict". Hard negatives teach it to distinguish peaceful water news from actual conflicts.
+
+**Output:** Creates `negatives_updated.csv` with:
+- ALL 120 hard negatives (priority_sample=True)
+- ~600 sampled ACLED negatives (priority_sample=False)
+- Total: ~720 training-ready negatives with ~17% hard negatives
 
 ---
 
@@ -128,14 +137,16 @@ python upload_datasets.py
 ```
 
 **What it does:**
-- Loads `../data/positives.csv` and `../data/negatives.csv`
+- Loads `../data/positives.csv`
+- Checks for `../data/negatives_updated.csv` (with hard negatives), falls back to `negatives.csv` if not found
 - Creates/updates HF Hub dataset repository
-- Uploads both files to `YOUR_ORG/water-conflict-training-data`
+- Uploads files to `YOUR_ORG/water-conflict-training-data`
+- Shows dataset composition (hard negatives vs ACLED negatives)
 
 **Requirements:**
 - HF authentication: `hf auth login`
 - Config file: Copy `config.sample.py` to `config.py` and set `HF_ORGANIZATION`
-- Training data must be prepared first
+- Training data must be prepared first (run `generate_hard_negatives.py` for best results)
 
 ---
 
@@ -220,20 +231,25 @@ python train_setfit_headline_classifier.py
 ### For Cloud Training (HF Jobs)
 
 ```bash
-# 1. Generate negative examples (if needed)
+# 1. Generate base ACLED negatives (if needed)
 cd scripts
 python transform_prep_negatives.py
 
-# 2. Configure your HF organization
+# 2. Generate training-ready negatives with hard negatives
+python generate_hard_negatives.py
+# Answer 'y' when prompted to merge - creates negatives_updated.csv
+
+# 3. Configure your HF organization
 cd ..
 cp config.sample.py config.py
 # Edit config.py and set HF_ORGANIZATION
 
-# 3. Upload training data to HF Hub
+# 4. Upload training data to HF Hub
 cd scripts
 python upload_datasets.py
+# This will use negatives_updated.csv automatically
 
-# 4. Run training on HF Jobs
+# 5. Run training on HF Jobs
 cd ..
 hf jobs uv run \
   --flavor a10g-large \

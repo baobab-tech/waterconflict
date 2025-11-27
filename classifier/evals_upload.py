@@ -41,6 +41,7 @@ def upload_eval_results(
         metrics: Evaluation metrics dict with structure:
             - overall: dict with f1_micro, f1_macro, accuracy, etc.
             - per_label: dict with per-label precision, recall, f1
+            - y_true, y_pred: numpy arrays (will be ignored)
         metadata: Optional additional metadata (model_repo, dataset_repo, etc.)
         token: Optional HF token (uses default if not provided)
         
@@ -48,6 +49,7 @@ def upload_eval_results(
         True if successful, False otherwise
     """
     try:
+        import numpy as np
         api = HfApi(token=token)
         
         # Ensure repository exists
@@ -72,6 +74,16 @@ def upload_eval_results(
             # Dataset doesn't exist yet or is empty
             pass
         
+        # Helper function to convert numpy types to Python types
+        def convert_value(val):
+            if val is None:
+                return None
+            if isinstance(val, (np.integer, np.floating)):
+                return val.item()
+            if isinstance(val, np.ndarray):
+                return None  # Skip arrays
+            return val
+        
         # Flatten metrics for easy comparison
         row_data = {
             "version": version,
@@ -89,21 +101,21 @@ def upload_eval_results(
             "test_split": config.get("test_split"),
             "num_iterations": config.get("num_iterations"),
             
-            # Overall metrics
-            "f1_micro": metrics.get("overall", {}).get("f1_micro"),
-            "f1_macro": metrics.get("overall", {}).get("f1_macro"),
-            "f1_samples": metrics.get("overall", {}).get("f1_samples"),
-            "accuracy": metrics.get("overall", {}).get("accuracy"),
-            "hamming_loss": metrics.get("overall", {}).get("hamming_loss"),
+            # Overall metrics (convert numpy types)
+            "f1_micro": convert_value(metrics.get("overall", {}).get("f1_micro")),
+            "f1_macro": convert_value(metrics.get("overall", {}).get("f1_macro")),
+            "f1_samples": convert_value(metrics.get("overall", {}).get("f1_samples")),
+            "accuracy": convert_value(metrics.get("overall", {}).get("accuracy")),
+            "hamming_loss": convert_value(metrics.get("overall", {}).get("hamming_loss")),
         }
         
-        # Add per-label metrics
+        # Add per-label metrics (convert numpy types)
         per_label = metrics.get("per_label", {})
         for label_name, label_metrics in per_label.items():
-            row_data[f"{label_name.lower()}_precision"] = label_metrics.get("precision")
-            row_data[f"{label_name.lower()}_recall"] = label_metrics.get("recall")
-            row_data[f"{label_name.lower()}_f1"] = label_metrics.get("f1")
-            row_data[f"{label_name.lower()}_support"] = label_metrics.get("support")
+            row_data[f"{label_name.lower()}_precision"] = convert_value(label_metrics.get("precision"))
+            row_data[f"{label_name.lower()}_recall"] = convert_value(label_metrics.get("recall"))
+            row_data[f"{label_name.lower()}_f1"] = convert_value(label_metrics.get("f1"))
+            row_data[f"{label_name.lower()}_support"] = convert_value(label_metrics.get("support"))
         
         # Add metadata
         if metadata:

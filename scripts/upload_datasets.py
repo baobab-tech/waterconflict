@@ -17,6 +17,7 @@ import pandas as pd
 from huggingface_hub import HfApi, create_repo
 from pathlib import Path
 import sys
+import io
 
 # Add project root to path and load configuration
 project_root = Path(__file__).parent.parent  # scripts/ -> waterconflict/
@@ -70,9 +71,19 @@ def main():
     print(f"\n[2/3] Uploading dataset files...")
     
     data_dir = Path(__file__).parent.parent / "data"  # scripts/ -> waterconflict/ -> data/
+    
+    # Check for negatives_updated.csv (training-ready version with hard negatives)
+    # If it exists, use it. Otherwise fall back to negatives.csv
+    negatives_file = "negatives_updated.csv" if (data_dir / "negatives_updated.csv").exists() else "negatives.csv"
+    
+    if negatives_file == "negatives_updated.csv":
+        print(f"  📊 Using {negatives_file} (includes hard negatives & balanced sampling)")
+    else:
+        print(f"  ⚠️  Using {negatives_file} (run generate_hard_negatives.py to create optimized version)")
+    
     files_to_upload = [
         ("positives.csv", "positives.csv"),
-        ("negatives.csv", "negatives.csv"),
+        (negatives_file, "negatives.csv"),  # Always upload as negatives.csv to HF
     ]
     
     for local_file, remote_file in files_to_upload:
@@ -82,18 +93,40 @@ def main():
             print(f"  ✗ File not found: {local_path}")
             continue
         
-        # Check file size
+        # Load and ensure consistent schema
+        df = pd.read_csv(local_path)
         file_size_mb = local_path.stat().st_size / (1024 * 1024)
-        print(f"  Uploading {local_file} ({file_size_mb:.2f} MB)...")
         
+        # Ensure priority_sample column exists in both files for schema consistency
+        if 'priority_sample' not in df.columns:
+            df['priority_sample'] = False  # All positives are False (not applicable)
+            print(f"  Added priority_sample column to {local_file}")
+        
+        # Show composition for negatives file
+        if local_file.startswith("negatives"):
+            priority_count = df['priority_sample'].sum()
+            acled_count = len(df) - priority_count
+            print(f"  Uploading {local_file} ({file_size_mb:.2f} MB)")
+            print(f"    - Total: {len(df)} negatives")
+            print(f"    - Hard negatives (water/peaceful): {int(priority_count)} ({priority_count/len(df)*100:.1f}%)")
+            print(f"    - ACLED negatives (general conflict): {acled_count}")
+        else:
+            print(f"  Uploading {local_file} ({file_size_mb:.2f} MB, {len(df)} examples)")
+        
+        # Upload from DataFrame to ensure consistent schema
         try:
+            # Save to temporary buffer with consistent schema
+            buffer = io.BytesIO()
+            df.to_csv(buffer, index=False)
+            buffer.seek(0)
+            
             api.upload_file(
-                path_or_fileobj=str(local_path),
+                path_or_fileobj=buffer.read(),
                 path_in_repo=remote_file,
                 repo_id=repo_id,
                 repo_type=REPO_TYPE,
             )
-            print(f"    ✓ Uploaded {remote_file}")
+            print(f"    ✓ Uploaded as {remote_file}")
         except Exception as e:
             print(f"    ✗ Error uploading {local_file}: {e}")
             sys.exit(1)
@@ -111,6 +144,10 @@ def main():
       },
       "Basis": {
         "dtype": "string",
+        "_type": "Value"
+      },
+      "priority_sample": {
+        "dtype": "bool",
         "_type": "Value"
       }
     }
@@ -154,16 +191,19 @@ This dataset contains labeled examples for training a multi-label water conflict
 ### Files
 
 - `positives.csv`: Water conflict headlines with labels (Trigger, Casualty, Weapon)
-- `negatives.csv`: Non-conflict news headlines (includes synthetic hard negatives)
+- `negatives.csv`: Non-conflict news headlines (pre-balanced with hard negatives)
 
 ### Data Format
 
-Both files have the same structure:
+Both files have consistent schema:
 
 | Column | Description |
 |--------|-------------|
 | Headline | News headline text |
 | Basis | For positives: comma-separated labels (Trigger, Casualty, Weapon). For negatives: empty string |
+| priority_sample | Boolean - For negatives: True for hard negatives (water-related peaceful news), False for ACLED. For positives: always False (not applicable) |
+
+Note: `priority_sample` exists in both files for schema consistency but only has meaning for negatives.
 
 ### Example Rows
 
@@ -185,15 +225,19 @@ Headline,Basis
 - **Casualty**: Water infrastructure as casualty/target
 - **Weapon**: Water as weapon/tool of conflict
 
-## Hard Negatives
+## Hard Negatives & Dataset Balance
 
-The negatives dataset includes synthetic "hard negatives" - peaceful water-related news that superficially resembles water conflicts but lacks violence. These are critical for preventing false positives where the model might classify any water-related news as a conflict.
+The negatives dataset is pre-balanced and training-ready, including:
 
-Examples:
-- Water infrastructure projects (peaceful development)
-- Water research and technology breakthroughs
-- Water conservation initiatives and conferences
-- Environmental water management topics
+1. **Hard Negatives (~120 examples, ~15-20% of negatives)**: Water-related peaceful news that teaches the model "water ≠ conflict". These prevent false positives where any water mention triggers conflict classification.
+   - Water infrastructure projects (peaceful development)
+   - Water research and technology breakthroughs  
+   - Water conservation initiatives and conferences
+   - Environmental water management topics
+
+2. **ACLED Negatives (~600 examples)**: General conflict news without water mentions. Sampled from full ACLED dataset for efficient training.
+
+The `priority_sample` column identifies hard negatives (True) vs regular negatives (False). This balanced composition eliminates the need for complex sampling logic during training - the dataset is ready to use as-is
 
 ## Usage
 

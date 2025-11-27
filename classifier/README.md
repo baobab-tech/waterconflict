@@ -121,9 +121,20 @@ See [PUBLISHING.md](PUBLISHING.md) for complete instructions on building and pub
 The training data combines:
 
 - **Positive Examples**: Water conflict headlines from [Pacific Institute Water Conflict Chronology](https://www.worldwater.org/water-conflict/)
-- **Negative Examples**: Non-water conflict events from [ACLED](https://acleddata.com/)
+- **Negative Examples**: Two types for balanced training:
+  1. **Hard Negatives (~120)**: Water-related peaceful news (infrastructure, research, conservation) to prevent false positives
+  2. **ACLED Negatives (~600)**: Non-water conflict events from [ACLED](https://acleddata.com/)
 
-Both positive and negative examples are labeled for three categories: Trigger, Casualty, and Weapon.
+### Hard Negatives Strategy
+
+Without hard negatives, the model learns "water mentioned → conflict" instead of "water + violence → conflict". Hard negatives are water-related headlines that lack violence or conflict:
+
+- Water infrastructure projects (dams, treatment plants)
+- Scientific water research and technology
+- Water conservation initiatives and conferences  
+- Environmental water management
+
+These are tagged with `priority_sample=True` in the dataset and are ALWAYS included in training (never diluted by sampling). This ensures the model correctly distinguishes peaceful water news from actual water conflicts.
 
 ## Resources
 

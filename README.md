@@ -51,8 +51,10 @@ waterconflict/
 │   └── Conflict data analysis and transforms
 │
 ├── data/              # 📂 Training Data
-│   ├── positives.csv  (water conflict headlines)
-│   ├── negatives.csv  (non-water conflict headlines)
+│   ├── positives.csv         (water conflict headlines)
+│   ├── negatives.csv         (base ACLED negatives)
+│   ├── negatives_updated.csv (training-ready: ACLED + hard negatives)
+│   ├── hard_negatives.csv    (peaceful water news)
 │   └── ACLED raw data
 │
 ├── experiment_history.jsonl  # Auto-generated training history
@@ -130,6 +132,7 @@ Multi-label SetFit classifier for identifying water-related conflict events in n
 Utility scripts that use the published package:
 - Demo classifier on sample headlines (`classify.py`)
 - Generate negative examples from ACLED data (`transform_prep_negatives.py`)
+- Generate hard negatives (peaceful water news) to prevent false positives (`generate_hard_negatives.py`)
 - Upload datasets to Hugging Face Hub (`upload_datasets.py`)
 - Train on HF Jobs cloud infrastructure (`train_on_hf.py`)
 - Compare training experiments (`view_experiments.py`)

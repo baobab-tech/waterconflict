@@ -42,11 +42,14 @@ class ExperimentTracker:
         Returns:
             Dictionary with complete experiment record
         """
+        # Clean metrics - remove numpy arrays and convert numpy types to Python types
+        cleaned_metrics = self._clean_metrics_for_json(metrics)
+        
         experiment = {
             "version": version,
             "timestamp": datetime.now().isoformat(),
             "config": config,
-            "metrics": metrics,
+            "metrics": cleaned_metrics,
             "metadata": metadata or {}
         }
         
@@ -55,6 +58,29 @@ class ExperimentTracker:
             f.write(json.dumps(experiment) + "\n")
         
         return experiment
+    
+    def _clean_metrics_for_json(self, metrics: dict) -> dict:
+        """
+        Clean metrics dict for JSON serialization.
+        Removes numpy arrays and converts numpy types to Python types.
+        """
+        import numpy as np
+        
+        cleaned = {}
+        for key, value in metrics.items():
+            # Skip numpy arrays (y_true, y_pred)
+            if isinstance(value, np.ndarray):
+                continue
+            # Recursively clean nested dicts
+            elif isinstance(value, dict):
+                cleaned[key] = self._clean_metrics_for_json(value)
+            # Convert numpy types to Python types
+            elif isinstance(value, (np.integer, np.floating)):
+                cleaned[key] = value.item()
+            else:
+                cleaned[key] = value
+        
+        return cleaned
     
     def get_experiments(self, limit: Optional[int] = None) -> list[dict]:
         """
