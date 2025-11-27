@@ -101,7 +101,11 @@ See `scripts/README.md` for cloud training details and `classifier/README.md` fo
 
 ### 4. Track Experiments & Compare Versions
 
-All training runs are automatically versioned and logged:
+All training runs are automatically versioned and logged. Each training run creates:
+- **Versioned model** on HF Hub with git tag (e.g., `v0.1.0`)
+- **Versioned training dataset** showing exact sampled data used (e.g., `org/water-conflict-training-data-v0.1.0`)
+- **Evaluation results** in HF evals dataset for comparison
+- **Local experiment log** in `experiment_history.jsonl`
 
 ```bash
 # View recent experiments

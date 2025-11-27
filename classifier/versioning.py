@@ -220,6 +220,17 @@ def create_hf_version_tag(model_repo: str,
         
         api = HfApi(token=token)
         
+        # Check if tag already exists
+        try:
+            refs = api.list_repo_refs(repo_id=model_repo, repo_type="model")
+            existing_tags = [tag.ref for tag in refs.tags] if hasattr(refs, 'tags') else []
+            if f"refs/tags/{version}" in existing_tags or version in existing_tags:
+                print(f"  ℹ Tag {version} already exists, skipping creation")
+                return True
+        except Exception:
+            # If we can't check, try to create anyway
+            pass
+        
         # Build tag message with key metrics
         tag_message_parts = [f"Version {version}"]
         
@@ -252,6 +263,11 @@ def create_hf_version_tag(model_repo: str,
         return True
         
     except Exception as e:
+        error_msg = str(e)
+        # Handle case where tag already exists
+        if "409" in error_msg or "already exists" in error_msg.lower():
+            print(f"  ℹ Tag {version} already exists, skipping creation")
+            return True
         print(f"  ✗ Failed to create HF Hub tag: {e}")
         return False
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # /// script
 # dependencies = [
-#     "water-conflict-classifier>=0.1.12",
+#     "water-conflict-classifier>=0.1.14",
 #     # For development/testing before PyPI publish, use:
 #     # "water-conflict-classifier @ git+https://github.com/yourusername/waterconflict.git#subdirectory=classifier",
 # ]
@@ -19,6 +19,7 @@ Prerequisites:
     - HF authentication token
 
 Usage with HF Jobs:
+    # Auto-increment minor version (v1.0 -> v1.1)
     hf jobs uv run \\
       --flavor a10g-large \\
       --timeout 2h \\
@@ -26,9 +27,36 @@ Usage with HF Jobs:
       --env HF_ORGANIZATION=your-org-name \\
       --namespace your-org-name \\
       scripts/train_on_hf.py
+    
+    # Specify exact version
+    hf jobs uv run \\
+      --flavor a10g-large \\
+      --timeout 2h \\
+      --secrets HF_TOKEN \\
+      --env HF_ORGANIZATION=your-org-name \\
+      --env MODEL_VERSION=v2.0 \\
+      --namespace your-org-name \\
+      scripts/train_on_hf.py
+    
+    # Auto-increment major version (v1.5 -> v2.0)
+    hf jobs uv run \\
+      --flavor a10g-large \\
+      --timeout 2h \\
+      --secrets HF_TOKEN \\
+      --env HF_ORGANIZATION=your-org-name \\
+      --env VERSION_BUMP=major \\
+      --namespace your-org-name \\
+      scripts/train_on_hf.py
 
 Local testing:
+    # Auto-increment (default: minor)
     uv run scripts/train_on_hf.py
+    
+    # Specify version
+    MODEL_VERSION=v1.5 uv run scripts/train_on_hf.py
+    
+    # Major version bump
+    VERSION_BUMP=major uv run scripts/train_on_hf.py
     
     Note: Still requires HF Hub authentication and uploaded datasets.
 """
@@ -59,7 +87,7 @@ from huggingface_hub import create_repo
 
 HF_ORGANIZATION = os.environ.get("HF_ORGANIZATION")
 DATASET_REPO_NAME = os.environ.get("DATASET_REPO_NAME", "water-conflict-training-data")
-MODEL_REPO_NAME = os.environ.get("MODEL_REPO_NAME", "water-conflict-classifier-minilm")
+MODEL_REPO_NAME = os.environ.get("MODEL_REPO_NAME", "water-conflict-classifier")
 EVALS_REPO_NAME = os.environ.get("EVALS_REPO_NAME", "water-conflict-classifier-evals")
 
 if not HF_ORGANIZATION:
@@ -72,7 +100,7 @@ MODEL_REPO = f"{HF_ORGANIZATION}/{MODEL_REPO_NAME}"
 EVALS_REPO = f"{HF_ORGANIZATION}/{EVALS_REPO_NAME}"
 
 # Training configuration
-BASE_MODEL = "sentence-transformers/all-MiniLM-L6-v2" # "BAAI/bge-small-en-v1.5"
+BASE_MODEL = "BAAI/bge-small-en-v1.5" # "sentence-transformers/all-MiniLM-L6-v2" # 
 USE_SAMPLE_TRAINING = True
 SAMPLE_SIZE = 1200  # Increased for better label representation, especially Weapon
 MIN_SAMPLES_PER_LABEL = 100  # Ensure each label gets sufficient training examples (especially Weapon ~292 available)
@@ -82,7 +110,8 @@ NUM_ITERATIONS = 20  # Reduced from default 20 (SetFit generates contrastive pai
 TEST_SIZE = 0.15
 
 # Versioning configuration
-VERSION = os.environ.get("MODEL_VERSION")  # Optional: set explicit version
+VERSION = os.environ.get("MODEL_VERSION")  # Optional: set explicit version (e.g., "v1.5")
+VERSION_BUMP = os.environ.get("VERSION_BUMP", "minor")  # "major" or "minor" for auto-increment
 AUTO_VERSION = VERSION is None  # Auto-increment if not specified
 EXPERIMENT_HISTORY_FILE = "experiment_history.jsonl"
 
@@ -113,7 +142,9 @@ def upload_training_dataset(train_data: pd.DataFrame,
     # Create versioned dataset repo name
     org = base_dataset_repo.split('/')[0]
     base_name = base_dataset_repo.split('/')[1]
-    versioned_repo = f"{org}/{base_name}-v{version}"
+    # Strip 'v' prefix if present to avoid double-v (version is already "v1.0" format)
+    version_suffix = version.lstrip('v')
+    versioned_repo = f"{org}/{base_name}-v{version_suffix}"
     
     print(f"  Uploading to: {versioned_repo}")
     
@@ -160,7 +191,7 @@ tags:
 license: cc-by-nc-4.0
 ---
 
-# Water Conflict Training Dataset - v{version}
+# Water Conflict Training Dataset - {version}
 
 This dataset contains the **actual sampled data** used to train model version `{version}`.
 
@@ -298,8 +329,14 @@ def main():
     
     # Determine version first so we can version the dataset
     if AUTO_VERSION:
-        version = get_next_version(EXPERIMENT_HISTORY_FILE)
-        print(f"  Auto-generated version: {version}")
+        is_major = VERSION_BUMP.lower() == "major"
+        version = get_next_version(
+            EXPERIMENT_HISTORY_FILE,
+            major=is_major,
+            minor=not is_major
+        )
+        bump_type = "major" if is_major else "minor"
+        print(f"  Auto-generated version ({bump_type} bump): {version}")
     else:
         version = VERSION
         print(f"  Using specified version: {version}")

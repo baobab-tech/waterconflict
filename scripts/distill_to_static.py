@@ -166,56 +166,107 @@ def main():
     print("  Loading training data from HF Hub...")
     
     try:
-        from huggingface_hub import hf_hub_download  # type: ignore
+        from huggingface_hub import hf_hub_download, model_info  # type: ignore
         from sklearn.linear_model import LogisticRegression  # type: ignore
         import pandas as pd  # type: ignore
+        import ast  # type: ignore
         
-        # Download and load the CSV files from HF Hub
-        dataset_repo = "baobabtech/water-conflict-training-data"
-        positives_path = hf_hub_download(
-            repo_id=dataset_repo,
-            filename="positives.csv",
-            repo_type="dataset"
-        )
-        negatives_path = hf_hub_download(
-            repo_id=dataset_repo,
-            filename="negatives.csv",
-            repo_type="dataset"
-        )
-        
-        positives = pd.read_csv(positives_path)
-        negatives = pd.read_csv(negatives_path)
-        
-        # Drop priority_sample from positives if present
-        if 'priority_sample' in positives.columns:
-            positives = positives.drop(columns=['priority_sample'])
-        
-        print(f"  ✓ Loaded {len(positives)} positive + {len(negatives)} negative examples")
-        
-        # Preprocess to multi-label format (matching data_prep.py logic)
-        positives['text'] = positives['Headline']
-        positives['labels'] = positives.apply(
-            lambda row: [
-                1 if 'Trigger' in str(row['Basis']) else 0,
-                1 if 'Casualty' in str(row['Basis']) else 0,
-                1 if 'Weapon' in str(row['Basis']) else 0
-            ], 
-            axis=1
-        )
-        
-        negatives['text'] = negatives['Headline']
-        negatives['labels'] = [[0, 0, 0]] * len(negatives)
-        
-        # Combine all data
-        data = pd.concat([
-            positives[['text', 'labels']], 
-            negatives[['text', 'labels']]
-        ], ignore_index=True)
-        
-        texts = data['text'].tolist()
-        labels_matrix = data['labels'].tolist()
-        
-        print(f"  ✓ Preprocessed {len(texts)} total examples")
+        # Get model version from model card tags
+        try:
+            info = model_info(args.model_id)  # type: ignore
+            version = None
+            
+            # Look for version in tags (e.g., 'v0.1.13')
+            if info.tags:  # type: ignore
+                for tag in info.tags:  # type: ignore
+                    if tag.startswith('v') and '.' in tag:
+                        version = tag[1:]  # Remove 'v' prefix
+                        break
+            
+            if version:
+                print(f"  Detected model version: {version}")
+                # Try to load versioned training dataset
+                org = args.model_id.split('/')[0]
+                # Strip 'v' prefix if present to avoid double-v (version is already "v1.0" format)
+                version_suffix = version.lstrip('v')
+                versioned_dataset_repo = f"{org}/water-conflict-training-data-v{version_suffix}"
+                
+                try:
+                    train_csv_path = hf_hub_download(
+                        repo_id=versioned_dataset_repo,
+                        filename="train.csv",
+                        repo_type="dataset"
+                    )
+                    
+                    data = pd.read_csv(train_csv_path)
+                    print(f"  ✓ Loaded versioned training dataset: {versioned_dataset_repo}")
+                    
+                    # Parse labels column (stored as string representation of list)
+                    if isinstance(data['labels'].iloc[0], str):
+                        data['labels'] = data['labels'].apply(ast.literal_eval)
+                    
+                    texts = data['text'].tolist()
+                    labels_matrix = data['labels'].tolist()
+                    
+                    print(f"  ✓ Loaded {len(texts)} training examples from v{version} dataset")
+                    
+                except Exception as e:
+                    print(f"  ⚠ Could not load versioned dataset: {e}")
+                    print(f"  → Falling back to base dataset")
+                    raise  # Fall through to base dataset loading
+            else:
+                raise Exception("No version found in model tags")
+                
+        except Exception as e:
+            print(f"  ⚠ Could not load versioned dataset: {e}")
+            print(f"  → Loading from base dataset: baobabtech/water-conflict-training-data")
+            
+            # Fallback: Download and load the CSV files from base HF Hub dataset
+            dataset_repo = "baobabtech/water-conflict-training-data"
+            positives_path = hf_hub_download(
+                repo_id=dataset_repo,
+                filename="positives.csv",
+                repo_type="dataset"
+            )
+            negatives_path = hf_hub_download(
+                repo_id=dataset_repo,
+                filename="negatives.csv",
+                repo_type="dataset"
+            )
+            
+            positives = pd.read_csv(positives_path)
+            negatives = pd.read_csv(negatives_path)
+            
+            # Drop priority_sample from positives if present
+            if 'priority_sample' in positives.columns:
+                positives = positives.drop(columns=['priority_sample'])
+            
+            print(f"  ✓ Loaded {len(positives)} positive + {len(negatives)} negative examples")
+            
+            # Preprocess to multi-label format (matching data_prep.py logic)
+            positives['text'] = positives['Headline']
+            positives['labels'] = positives.apply(
+                lambda row: [
+                    1 if 'Trigger' in str(row['Basis']) else 0,
+                    1 if 'Casualty' in str(row['Basis']) else 0,
+                    1 if 'Weapon' in str(row['Basis']) else 0
+                ], 
+                axis=1
+            )
+            
+            negatives['text'] = negatives['Headline']
+            negatives['labels'] = [[0, 0, 0]] * len(negatives)
+            
+            # Combine all data
+            data = pd.concat([
+                positives[['text', 'labels']], 
+                negatives[['text', 'labels']]
+            ], ignore_index=True)
+            
+            texts = data['text'].tolist()
+            labels_matrix = data['labels'].tolist()
+            
+            print(f"  ✓ Preprocessed {len(texts)} total examples")
         
         # Generate embeddings with distilled model
         print(f"  Generating distilled embeddings for training data...")

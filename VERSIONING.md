@@ -6,7 +6,9 @@ This project includes a built-in versioning system for tracking model experiment
 
 - **Automatic Version Numbering**: Auto-generates version numbers (v1.0, v1.1, etc.)
 - **Experiment History**: Logs all training configs and metrics to `experiment_history.jsonl`
+- **Versioned Training Datasets**: Creates a separate HF dataset for each training run showing exact sampled data used
 - **HuggingFace Hub Tags**: Creates git tags on HF Hub for easy model version retrieval
+- **Evaluation Dataset**: Uploads evaluation results to HF for cross-experiment comparison
 - **Comparison Tools**: Compare metrics across different versions
 - **Extensible**: Easy to extend to W&B or MLflow later
 
@@ -82,22 +84,26 @@ Difference: +0.0531 (+6.45%)
 
 ## HuggingFace Hub Integration
 
-### Automatic Tagging
+### Automatic Tagging & Dataset Versioning
 
 When training with `train_on_hf.py`, the script automatically:
-1. Logs experiment to `experiment_history.jsonl`
-2. Creates a git tag on your HF Hub model repository
-3. Includes key metrics in the tag message
+1. Uploads versioned training dataset (e.g., `org/water-conflict-training-data-v1.0`)
+2. Trains model and pushes to HF Hub
+3. Creates a git tag on your HF Hub model repository
+4. Uploads evaluation results to evals dataset
+5. Logs experiment to `experiment_history.jsonl`
+6. Links all artifacts together (model → training dataset → evals)
 
 ### Loading Specific Versions
 
 ```python
 from setfit import SetFitModel
+from datasets import load_dataset
 
-# Load latest version
+# Load latest model
 model = SetFitModel.from_pretrained("your-org/water-conflict-classifier")
 
-# Load specific version by tag
+# Load specific model version by tag
 model_v10 = SetFitModel.from_pretrained(
     "your-org/water-conflict-classifier",
     revision="v1.0"
@@ -107,6 +113,11 @@ model_v12 = SetFitModel.from_pretrained(
     "your-org/water-conflict-classifier", 
     revision="v1.2"
 )
+
+# Load the exact training data used for a specific version
+training_data_v10 = load_dataset("your-org/water-conflict-training-data-v1.0")
+train_split = training_data_v10['train']  # Training samples
+test_split = training_data_v10['test']    # Test samples
 ```
 
 ### Manual Version Specification
@@ -152,10 +163,71 @@ Experiments are logged to `experiment_history.jsonl` in JSON Lines format:
   },
   "metadata": {
     "model_repo": "baobabtech/water-conflict-classifier",
-    "dataset_repo": "baobabtech/water-conflict-training-data"
+    "dataset_repo": "baobabtech/water-conflict-training-data",
+    "training_dataset_repo": "baobabtech/water-conflict-training-data-v1.0"
   }
 }
 ```
+
+## Versioned Training Datasets
+
+### What Gets Created
+
+Each training run creates a separate versioned dataset on HF Hub containing:
+- **train.csv**: The exact sampled training data used
+- **test.csv**: The held-out test set
+- **README.md**: Dataset card with sampling configuration and metadata
+
+### Dataset Naming
+
+Versioned datasets follow the pattern: `{org}/{base-dataset-name}-v{version}`
+
+Example:
+- Base dataset: `baobabtech/water-conflict-training-data`
+- Model version: `v1.0`
+- Training dataset: `baobabtech/water-conflict-training-data-v1.0`
+
+### Why This Matters
+
+**Full Reproducibility**: Anyone can see exactly what data trained a specific model version, including:
+- Which samples were selected during stratified sampling
+- Train/test split composition
+- Sampling configuration parameters
+
+**Transparency**: Clear audit trail from raw data → sampled data → trained model → evaluation results
+
+**Comparison**: Compare not just model performance, but the actual training data used across versions
+
+### Accessing Training Datasets
+
+```python
+from datasets import load_dataset
+
+# Load training dataset for a specific model version
+dataset = load_dataset("your-org/water-conflict-training-data-v1.0")
+
+# Access splits
+train_data = dataset['train']
+test_data = dataset['test']
+
+# View as pandas
+import pandas as pd
+train_df = train_data.to_pandas()
+test_df = test_data.to_pandas()
+
+print(f"Training samples: {len(train_df)}")
+print(f"Test samples: {len(test_df)}")
+```
+
+### Dataset Card Contents
+
+Each versioned dataset includes:
+- Parent dataset reference
+- Model version link
+- Exact sample counts (train/test)
+- Sampling configuration (sample size, stratification settings, etc.)
+- Label distribution
+- Usage instructions
 
 ## Programmatic Usage
 
@@ -293,18 +365,25 @@ python scripts/view_experiments.py --compare v1.0 v1.1
 
 # 5. Push to HF Hub with versioning
 uv run scripts/train_on_hf.py
+# → Creates versioned training dataset (org/water-conflict-training-data-v1.2)
+# → Trains and uploads model
 # → Logs as v1.2 + creates HF Hub tag
+# → Uploads evals to comparison dataset
 
-# 6. Later, load specific version
+# 6. Later, load specific version and its training data
 python
 >>> from setfit import SetFitModel
+>>> from datasets import load_dataset
 >>> model = SetFitModel.from_pretrained("org/model", revision="v1.2")
+>>> training_data = load_dataset("org/water-conflict-training-data-v1.2")
 ```
 
 ## Next Steps
 
-- Add visualization dashboard (plotly/streamlit)
-- Integrate with Weights & Biases for charts
+- Add visualization dashboard (plotly/streamlit) for experiment comparison
+- Integrate with Weights & Biases for real-time charts
 - Add automatic model selection (load best performing version)
 - Export comparison tables to markdown/CSV
+- Add dataset diff tool (compare training data across versions)
+- Automated data quality checks for training datasets
 
