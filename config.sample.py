@@ -13,3 +13,7 @@ DATASET_REPO_NAME = "water-conflict-training-data"
 # Model repository name (don't include org/username prefix)
 MODEL_REPO_NAME = "water-conflict-classifier"
 
+# Evals dataset repository name (don't include org/username prefix)
+# Used to track evaluation results across training runs
+EVALS_REPO_NAME = "water-conflict-classifier-evals"
+

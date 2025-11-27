@@ -5,7 +5,7 @@ Scripts for data preparation, dataset management, cloud training, and experiment
 ## Scripts
 
 ### `view_experiments.py`
-View and compare model training experiments. All training runs are automatically logged with metrics and configs.
+View and compare model training experiments from local experiment history. All training runs are automatically logged with metrics and configs.
 
 **Usage:**
 ```bash
@@ -29,6 +29,41 @@ python scripts/view_experiments.py --compare v1.0 v1.2 --metric accuracy
 - Helps identify improvements and regressions
 
 **See:** `../VERSIONING.md` for full documentation
+
+---
+
+### `view_evals.py`
+View and compare evaluation results from HuggingFace evals dataset. Training runs automatically upload results to HF for easy comparison across experiments.
+
+**Usage:**
+```bash
+# View all experiments sorted by F1 score
+python scripts/view_evals.py
+
+# Show top 10 experiments
+python scripts/view_evals.py --top 10
+
+# Compare two specific versions
+python scripts/view_evals.py --compare v1.0 v1.1
+
+# Analyze impact of hyperparameters
+python scripts/view_evals.py --analyze sample_size
+python scripts/view_evals.py --analyze num_epochs
+
+# Show detailed per-label metrics for top experiments
+python scripts/view_evals.py --labels --top 5
+```
+
+**What it does:**
+- Loads evaluation results from HF dataset (`YOUR_ORG/water-conflict-classifier-evals`)
+- Displays metrics, configs, and comparisons in tabular format
+- Analyzes hyperparameter impact on performance
+- Shows per-label precision, recall, F1 for each experiment
+- Helps identify optimal training configurations
+
+**Requirements:**
+- HF authentication: `hf auth login`
+- Evals dataset populated via `train_on_hf.py` runs
 
 ---
 
@@ -129,6 +164,7 @@ MODEL_VERSION=v2.0 hf jobs uv run ... scripts/train_on_hf.py
 - Pushes trained model to HF Hub with model card
 - Auto-versions and logs experiment to `experiment_history.jsonl`
 - Creates git tag on HF Hub for version retrieval
+- Uploads evaluation results to HF evals dataset for comparison
 
 **Requirements:**
 - Package published to PyPI (already done: [water-conflict-classifier](https://pypi.org/project/water-conflict-classifier/))

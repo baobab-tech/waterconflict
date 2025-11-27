@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # /// script
 # dependencies = [
-#     "water-conflict-classifier>=0.1.7",
+#     "water-conflict-classifier>=0.1.9",
 #     # For development/testing before PyPI publish, use:
 #     # "water-conflict-classifier @ git+https://github.com/yourusername/waterconflict.git#subdirectory=classifier",
 # ]
@@ -50,6 +50,7 @@ from training_logic import train_model
 from evaluation import evaluate_model, print_evaluation_results
 from model_card import generate_model_card
 from versioning import ExperimentTracker, create_hf_version_tag, get_next_version
+from evals_upload import upload_eval_results
 
 # ============================================================================
 # CONFIGURATION
@@ -58,6 +59,7 @@ from versioning import ExperimentTracker, create_hf_version_tag, get_next_versio
 HF_ORGANIZATION = os.environ.get("HF_ORGANIZATION")
 DATASET_REPO_NAME = os.environ.get("DATASET_REPO_NAME", "water-conflict-training-data")
 MODEL_REPO_NAME = os.environ.get("MODEL_REPO_NAME", "water-conflict-classifier")
+EVALS_REPO_NAME = os.environ.get("EVALS_REPO_NAME", "water-conflict-classifier-evals")
 
 if not HF_ORGANIZATION:
     print("\n✗ Configuration not found!")
@@ -66,15 +68,16 @@ if not HF_ORGANIZATION:
 
 DATASET_REPO = f"{HF_ORGANIZATION}/{DATASET_REPO_NAME}"
 MODEL_REPO = f"{HF_ORGANIZATION}/{MODEL_REPO_NAME}"
+EVALS_REPO = f"{HF_ORGANIZATION}/{EVALS_REPO_NAME}"
 
 # Training configuration
 BASE_MODEL = "BAAI/bge-small-en-v1.5"
 USE_SAMPLE_TRAINING = True
-SAMPLE_SIZE = 1500  # Increased for better label representation, especially Weapon
-MIN_SAMPLES_PER_LABEL = 250  # Ensure each label gets sufficient training examples (especially Weapon ~292 available)
+SAMPLE_SIZE = 400  # Increased for better label representation, especially Weapon
+MIN_SAMPLES_PER_LABEL = 64  # Ensure each label gets sufficient training examples (especially Weapon ~292 available)
 BATCH_SIZE = 64  # Increased for faster training with larger dataset
 NUM_EPOCHS = 1  # SetFit best practice: <1 epoch with more data
-NUM_ITERATIONS = 10  # Reduced from default 20 (SetFit generates contrastive pairs, less needed with more data)
+NUM_ITERATIONS = 20  # Reduced from default 20 (SetFit generates contrastive pairs, less needed with more data)
 TEST_SIZE = 0.15
 
 # Versioning configuration
@@ -217,7 +220,8 @@ def main():
         test_split=TEST_SIZE,
         full_train_size=len(full_train),
         num_iterations=NUM_ITERATIONS,
-        sampling_strategy="undersampling"
+        sampling_strategy="undersampling",
+        evals_repo=EVALS_REPO
     )
     
     print("  ✓ Model card generated")
@@ -244,7 +248,7 @@ def main():
         print(f"  ✓ Model pushed to: https://huggingface.co/{MODEL_REPO}")
         
         # Version tagging & experiment tracking
-        print("\n[9/9] Logging experiment & creating version tag...")
+        print("\n[9/10] Logging experiment & creating version tag...")
         
         # Determine version
         if AUTO_VERSION:
@@ -283,6 +287,19 @@ def main():
             version=version,
             metrics=eval_results,
             config=experiment['config']
+        )
+        
+        # Upload evaluation results to HF evals dataset
+        print(f"\n[10/10] Uploading evaluation results to HF evals dataset...")
+        upload_eval_results(
+            repo_id=EVALS_REPO,
+            version=version,
+            config=experiment['config'],
+            metrics=eval_results,
+            metadata={
+                "model_repo": MODEL_REPO,
+                "dataset_repo": DATASET_REPO,
+            }
         )
         
     except Exception as e:

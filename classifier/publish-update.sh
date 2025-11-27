@@ -33,7 +33,8 @@ fi
 
 # Update version in pyproject.toml
 echo "✏️  Updating version in pyproject.toml..."
-sed -i '' "s/version = \"$CURRENT_VERSION\"/version = \"$NEW_VERSION\"/" pyproject.toml
+CURRENT_TOML_VERSION=$(grep -E '^version = ' pyproject.toml | sed -E 's/version = "(.*)"/\1/')
+sed -i '' "s/version = \"$CURRENT_TOML_VERSION\"/version = \"$NEW_VERSION\"/" pyproject.toml
 
 # Update version in train_on_hf.py
 echo "✏️  Updating version in ../scripts/train_on_hf.py..."

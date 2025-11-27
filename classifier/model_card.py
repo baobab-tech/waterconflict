@@ -16,7 +16,8 @@ def generate_model_card(model_repo: str,
                        test_split: float,
                        full_train_size: int = None,
                        num_iterations: int = 20,
-                       sampling_strategy: str = "oversampling") -> str:
+                       sampling_strategy: str = "oversampling",
+                       evals_repo: str = None) -> str:
     """
     Generate comprehensive model card with evaluation results.
     
@@ -33,6 +34,7 @@ def generate_model_card(model_repo: str,
         full_train_size: Original training pool size (before sampling)
         num_iterations: Number of contrastive pair iterations
         sampling_strategy: Training sampling strategy
+        evals_repo: Optional HF evals dataset repo ID for experiment tracking
         
     Returns:
         Model card markdown string
@@ -224,7 +226,25 @@ Evaluated on a held-out test set of {test_size} samples ({test_split*100:.0f}% o
 - **Epochs**: {num_epochs}
 - **Iterations**: {num_iterations} (contrastive pair generation)
 - **Sampling strategy**: {sampling_strategy} (balances positive/negative pairs)
+"""
+    
+    # Add experiment tracking section if evals repo is provided
+    if evals_repo:
+        model_card += f"""
+### 📈 Experiment Tracking
 
+All training runs are automatically tracked in a public dataset for experiment comparison:
+
+- **Evals Dataset**: [{evals_repo}](https://huggingface.co/datasets/{evals_repo})
+- **Tracked Metrics**: F1 scores, accuracy, per-label performance, and all hyperparameters
+- **Compare Experiments**: View how different configurations (sample size, epochs, batch size) affect performance
+- **Reproducibility**: Full training configs logged for each version
+
+You can explore past experiments and compare model performance across versions using the evals dataset.
+
+"""
+    
+    model_card += """
 ## 📊 Data Sources
 
 ### Positive Examples (Water Conflict Headlines)
