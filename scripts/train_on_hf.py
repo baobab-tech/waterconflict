@@ -1,28 +1,22 @@
 #!/usr/bin/env python
 # /// script
 # dependencies = [
-#     "pandas>=2.0.0",
-#     "numpy>=1.24.0",
-#     "datasets>=2.14.0",
-#     "setfit>=1.0.0",
-#     "sentence-transformers>=2.2.0",
-#     "scikit-learn>=1.3.0",
-#     "huggingface-hub>=0.19.0",
-#     "torch>=2.0.0",
+#     "water-conflict-classifier>=0.1.4",
+#     # For development/testing before PyPI publish, use:
+#     # "water-conflict-classifier @ git+https://github.com/yourusername/waterconflict.git#subdirectory=classifier",
 # ]
 # ///
 
 """
 SetFit Multi-Label Water Conflict Classifier - HF Jobs Training Script
 
-This script is optimized for running on Hugging Face Jobs infrastructure.
-It loads data from HF Hub and pushes the trained model back to HF Hub.
+Uses the published water-conflict-classifier package from PyPI.
+Package source code is in ../classifier/
 
-TRAINING OPTIMIZATION:
-SetFit is designed for few-shot learning (8-100 examples per class) and reaches
-peak performance quickly. With large datasets (>1000 samples), training time
-explodes due to contrastive pair generation. This script samples the data by
-default for efficient training with minimal performance loss.
+Prerequisites:
+    - Package published to PyPI: https://pypi.org/project/water-conflict-classifier/
+    - Training data uploaded to HF Hub (see upload_datasets.py)
+    - HF authentication token
 
 Usage with HF Jobs:
     hf jobs uv run \\
@@ -30,15 +24,17 @@ Usage with HF Jobs:
       --timeout 2h \\
       --secrets HF_TOKEN \\
       --env HF_ORGANIZATION=your-org-name \\
-      train_on_hf.py
+      --namespace your-org-name \\
+      scripts/train_on_hf.py
 
 Local testing:
-    uv run train_on_hf.py
+    uv run scripts/train_on_hf.py
+    
+    Note: Still requires HF Hub authentication and uploaded datasets.
 """
 
 import os
 import sys
-from pathlib import Path
 import pandas as pd
 import numpy as np
 from datasets import Dataset
@@ -48,59 +44,42 @@ from huggingface_hub import HfApi, login
 import warnings
 warnings.filterwarnings('ignore')
 
-# Add project root to path and load configuration
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
-
-# Try to load from config.py (local development), fall back to env vars (HF Jobs)
-try:
-    from config import HF_ORGANIZATION, DATASET_REPO_NAME, MODEL_REPO_NAME
-    print("  ✓ Loaded config from config.py")
-except ImportError:
-    HF_ORGANIZATION = os.environ.get("HF_ORGANIZATION")
-    DATASET_REPO_NAME = os.environ.get("DATASET_REPO_NAME", "water-conflict-training-data")
-    MODEL_REPO_NAME = os.environ.get("MODEL_REPO_NAME", "water-conflict-classifier")
-    
-    if not HF_ORGANIZATION:
-        print("\n✗ Configuration not found!")
-        print("  For local development: Copy config.sample.py to config.py")
-        print("  For HF Jobs: Set HF_ORGANIZATION environment variable\n")
-        print("  Example HF Jobs command:")
-        print("    hf jobs uv run \\")
-        print("      --flavor a10g-large \\")
-        print("      --timeout 2h \\")
-        print("      --secrets HF_TOKEN \\")
-        print("      --env HF_ORGANIZATION=your-org-name \\")
-        print("      train_on_hf.py\n")
-        sys.exit(1)
-    
-    print(f"  ✓ Loaded config from environment (org: {HF_ORGANIZATION})")
-
-# Import shared modules (same directory)
-from data_prep import load_hub_data, preprocess_data, LABEL_NAMES
+# Import from package modules
+from data_prep import load_hub_data, preprocess_data, stratified_sample_for_training, LABEL_NAMES
 from training_logic import train_model
 from evaluation import evaluate_model, print_evaluation_results
 from model_card import generate_model_card
+from versioning import ExperimentTracker, create_hf_version_tag, get_next_version
 
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
 
-# Dataset and model repos from config
+HF_ORGANIZATION = os.environ.get("HF_ORGANIZATION")
+DATASET_REPO_NAME = os.environ.get("DATASET_REPO_NAME", "water-conflict-training-data")
+MODEL_REPO_NAME = os.environ.get("MODEL_REPO_NAME", "water-conflict-classifier")
+
+if not HF_ORGANIZATION:
+    print("\n✗ Configuration not found!")
+    print("  Set HF_ORGANIZATION environment variable\n")
+    sys.exit(1)
+
 DATASET_REPO = f"{HF_ORGANIZATION}/{DATASET_REPO_NAME}"
 MODEL_REPO = f"{HF_ORGANIZATION}/{MODEL_REPO_NAME}"
 
 # Training configuration
-BASE_MODEL = "BAAI/bge-small-en-v1.5"  # 33.4M params, fast inference
-
-# SetFit is designed for few-shot learning (8-64 samples per class)
-# With large datasets, sampling down gives similar performance with much faster training
-USE_SAMPLE_TRAINING = True  # Set to False to use all data (slower, minimal benefit)
-SAMPLE_SIZE = 600  # ~100 examples per label combination (if USE_SAMPLE_TRAINING=True)
-
-BATCH_SIZE = 32  # Increased from 16 (faster with sampled data)
-NUM_EPOCHS = 1  # Reduced from 3 (SetFit reaches plateau quickly)
+BASE_MODEL = "BAAI/bge-small-en-v1.5"
+USE_SAMPLE_TRAINING = True
+SAMPLE_SIZE = 1200  # Increased for better label representation, especially Weapon
+MIN_SAMPLES_PER_LABEL = 150  # Ensure each label gets sufficient training examples
+BATCH_SIZE = 32
+NUM_EPOCHS = 1
 TEST_SIZE = 0.15
+
+# Versioning configuration
+VERSION = os.environ.get("MODEL_VERSION")  # Optional: set explicit version
+AUTO_VERSION = VERSION is None  # Auto-increment if not specified
+EXPERIMENT_HISTORY_FILE = "experiment_history.jsonl"
 
 # ============================================================================
 # AUTHENTICATION
@@ -118,7 +97,6 @@ def setup_authentication():
             login()
         except Exception as e:
             print(f"  ✗ Authentication failed: {e}")
-            print("  Please run: hf auth login")
             return False
     return True
 
@@ -150,54 +128,50 @@ def main():
     for name, count in zip(LABEL_NAMES, label_counts):
         print(f"    - {name}: {int(count)} ({count/len(positives)*100:.1f}%)")
     
-    # Step 3: Train/test split (BEFORE sampling for more robust test metrics)
+    # Step 3: Train/test split
     print(f"\n[3/8] Splitting dataset ({int((1-TEST_SIZE)*100)}% train / {int(TEST_SIZE*100)}% test)...")
-    print(f"  Full dataset: {len(data)} examples")
     
     full_train_raw, test_data_raw = train_test_split(
         data,
         test_size=TEST_SIZE,
         random_state=42,
-        stratify=data['labels'].apply(lambda x: tuple(x))
+        stratify=data['labels'].apply(lambda x: tuple(x))  # type: ignore
     )
     
-    # Ensure DataFrames are properly typed
-    full_train: pd.DataFrame = pd.DataFrame(full_train_raw).reset_index(drop=True)
-    test_data: pd.DataFrame = pd.DataFrame(test_data_raw).reset_index(drop=True)
+    full_train = pd.DataFrame(full_train_raw).reset_index(drop=True)
+    test_data = pd.DataFrame(test_data_raw).reset_index(drop=True)
     
     print(f"  ✓ Full training pool: {len(full_train)} examples")
     print(f"  ✓ Test set (held-out): {len(test_data)} examples")
     
-    # Step 4: Optional sampling from training pool (SetFit performs best with smaller datasets)
+    # Step 4: Optional sampling with stratification
     if USE_SAMPLE_TRAINING and len(full_train) > SAMPLE_SIZE:
-        print(f"\n[4/8] Sampling training data for efficient training...")
-        print(f"  Training pool: {len(full_train)} examples")
-        print(f"  Sampling to: {SAMPLE_SIZE} examples")
-        print(f"  Rationale: SetFit reaches peak performance with ~8-100 examples per class")
-        print(f"  Test set: {len(test_data)} examples (unchanged, more robust metrics)")
-        
-        train_data_raw = full_train.sample(n=SAMPLE_SIZE, random_state=42).reset_index(drop=True)
+        print(f"\n[4/8] Sampling training data with stratification...")
+        print(f"  Target samples: {SAMPLE_SIZE}")
+        print(f"  Ensuring minimum {MIN_SAMPLES_PER_LABEL} samples per label")
+        train_data = stratified_sample_for_training(
+            full_train,
+            n_samples=SAMPLE_SIZE,
+            min_samples_per_label=MIN_SAMPLES_PER_LABEL,
+            random_state=42
+        )
     else:
         print(f"\n[4/8] Using all training data (no sampling)...")
-        train_data_raw = full_train
-    
-    # Ensure final training data is properly typed
-    train_data: pd.DataFrame = pd.DataFrame(train_data_raw).reset_index(drop=True)
+        train_data = pd.DataFrame(full_train).reset_index(drop=True)
     
     print(f"  ✓ Final training set: {len(train_data)} examples")
     print(f"  ✓ Final test set: {len(test_data)} examples")
     
     # Convert to HF Dataset format
-    train_df: pd.DataFrame = train_data[['text', 'labels']]  # type: ignore
-    test_df: pd.DataFrame = test_data[['text', 'labels']]  # type: ignore
-    train_dataset = Dataset.from_pandas(train_df)
-    test_dataset = Dataset.from_pandas(test_df)
+    train_df = train_data[['text', 'labels']]
+    test_df = test_data[['text', 'labels']]
+    train_dataset = Dataset.from_pandas(train_df)  # type: ignore
+    test_dataset = Dataset.from_pandas(test_df)  # type: ignore
     
     # Step 5: Train
     print(f"\n[5/8] Training model...")
     print(f"  (Estimated time: ~2-5 minutes on A10G GPU with sampled data)\n")
     
-    # Configure model card metadata
     model_card_data = SetFitModelCardData(
         language="en",
         license="cc-by-nc-4.0",
@@ -250,14 +224,12 @@ def main():
     print(f"  Target repository: {MODEL_REPO}")
     
     try:
-        # Push model to Hub
         model.push_to_hub(
             MODEL_REPO,
             commit_message=f"Training complete - F1: {eval_results['overall']['f1_micro']:.4f}",
-            private=False,  # Set to True for private model
+            private=False,
         )
         
-        # Upload model card
         api = HfApi()
         api.upload_file(
             path_or_fileobj=model_card.encode(),
@@ -268,10 +240,51 @@ def main():
         
         print(f"  ✓ Model pushed to: https://huggingface.co/{MODEL_REPO}")
         
+        # Version tagging & experiment tracking
+        print("\n[9/9] Logging experiment & creating version tag...")
+        
+        # Determine version
+        if AUTO_VERSION:
+            version = get_next_version(EXPERIMENT_HISTORY_FILE)
+            print(f"  Auto-generated version: {version}")
+        else:
+            version = VERSION
+            print(f"  Using specified version: {version}")
+        
+        # Log experiment to local history
+        tracker = ExperimentTracker(EXPERIMENT_HISTORY_FILE)
+        experiment = tracker.log_experiment(
+            version=version,
+            config={
+                "base_model": BASE_MODEL,
+                "train_size": len(train_data),
+                "test_size": len(test_data),
+                "full_train_size": len(full_train),
+                "batch_size": BATCH_SIZE,
+                "num_epochs": NUM_EPOCHS,
+                "sample_size": SAMPLE_SIZE if USE_SAMPLE_TRAINING else None,
+                "sampling_strategy": "undersampling",
+                "test_split": TEST_SIZE,
+            },
+            metrics=eval_results,
+            metadata={
+                "model_repo": MODEL_REPO,
+                "dataset_repo": DATASET_REPO,
+            }
+        )
+        print(f"  ✓ Logged to {EXPERIMENT_HISTORY_FILE}")
+        
+        # Create HF Hub tag
+        create_hf_version_tag(
+            model_repo=MODEL_REPO,
+            version=version,
+            metrics=eval_results,
+            config=experiment['config']
+        )
+        
     except Exception as e:
         print(f"  ✗ Error pushing to Hub: {e}")
         print("  Model trained successfully but not uploaded.")
-        print("  You can manually upload using: model.push_to_hub()")
     
     # Example predictions
     print("\n" + "=" * 80)
@@ -304,4 +317,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

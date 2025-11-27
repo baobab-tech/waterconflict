@@ -19,7 +19,7 @@ from pathlib import Path
 import sys
 
 # Add project root to path and load configuration
-project_root = Path(__file__).parent.parent.parent
+project_root = Path(__file__).parent.parent  # scripts/ -> waterconflict/
 sys.path.insert(0, str(project_root))
 
 try:
@@ -69,7 +69,7 @@ def main():
     # Upload files
     print(f"\n[2/3] Uploading dataset files...")
     
-    data_dir = Path(__file__).parent.parent.parent / "data"
+    data_dir = Path(__file__).parent.parent / "data"  # scripts/ -> waterconflict/ -> data/
     files_to_upload = [
         ("positives.csv", "positives.csv"),
         ("negatives.csv", "negatives.csv"),
@@ -124,20 +124,30 @@ This dataset contains labeled examples for training a multi-label water conflict
 ### Files
 
 - `positives.csv`: Water conflict headlines with labels (Trigger, Casualty, Weapon)
-- `negatives.csv`: Non-conflict news headlines
+- `negatives.csv`: Non-conflict news headlines (empty Basis column)
 
-### Positives Format
+### Data Format
+
+Both files have the same structure:
 
 | Column | Description |
 |--------|-------------|
 | Headline | News headline text |
-| Basis | Comma-separated labels: Trigger, Casualty, Weapon |
+| Basis | For positives: comma-separated labels (Trigger, Casualty, Weapon). For negatives: empty string |
 
-### Negatives Format
+### Example Rows
 
-| Column | Description |
-|--------|-------------|
-| Headline | Non-conflict news headline text |
+**Positive example:**
+```
+Headline,Basis
+"Water reservoir attacked in region X",Casualty
+```
+
+**Negative example:**
+```
+Headline,Basis
+"Political protest unrelated to water","
+```
 
 ## Labels
 

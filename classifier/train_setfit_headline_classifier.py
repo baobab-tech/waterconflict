@@ -15,10 +15,11 @@ from sklearn.model_selection import train_test_split
 import warnings
 warnings.filterwarnings('ignore')
 
-# Import shared modules
+# Import from package modules
 from data_prep import load_local_data, preprocess_data, LABEL_NAMES
 from training_logic import train_model
 from evaluation import evaluate_model, print_evaluation_results
+from versioning import ExperimentTracker, get_next_version
 
 print("=" * 80)
 print("SetFit Multi-Label Water Conflict Classifier Training")
@@ -117,6 +118,39 @@ print(f"\n  ✓ Model saved to: {model_path}")
 print("\n  To load the model later:")
 print(f"    from setfit import SetFitModel")
 print(f"    model = SetFitModel.from_pretrained('{model_path}')")
+
+# ============================================================================
+# 7. LOG EXPERIMENT
+# ============================================================================
+print("\n[7/7] Logging experiment...")
+
+EXPERIMENT_HISTORY_FILE = "../experiment_history.jsonl"
+
+# Auto-generate version
+version = get_next_version(EXPERIMENT_HISTORY_FILE)
+print(f"  Version: {version}")
+
+# Log experiment to history
+tracker = ExperimentTracker(EXPERIMENT_HISTORY_FILE)
+tracker.log_experiment(
+    version=version,
+    config={
+        "base_model": "BAAI/bge-small-en-v1.5",
+        "train_size": len(train_data),
+        "test_size": len(test_data),
+        "batch_size": 16,
+        "num_epochs": 3,
+        "sampling_strategy": "oversampling",
+        "training_type": "local"
+    },
+    metrics=eval_results,
+    metadata={
+        "model_path": model_path,
+        "training_script": "train_setfit_headline_classifier.py"
+    }
+)
+
+print(f"  ✓ Logged to {EXPERIMENT_HISTORY_FILE}")
 
 # ============================================================================
 # EXAMPLE PREDICTIONS

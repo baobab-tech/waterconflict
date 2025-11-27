@@ -15,6 +15,9 @@ transformers>=4.30.0
 # PyTorch (CPU version - use GPU version if needed)
 torch>=2.0.0
 
+# Hugging Face Hub (for HF Jobs and model upload)
+huggingface-hub>=0.19.0
+
 # Utilities
 tqdm>=4.65.0
 

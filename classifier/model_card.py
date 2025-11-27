@@ -112,12 +112,29 @@ These categories align with the Pacific Institute's Water Conflict Chronology fr
 
 ## 💻 Usage
 
+### Installation
+
+The training code is published as a Python package on PyPI:
+
+```bash
+pip install water-conflict-classifier
+```
+
+**Package includes:**
+- Data preprocessing utilities
+- Training logic (SetFit multi-label)
+- Evaluation metrics
+- Model card generation
+
+**Source code:** https://github.com/baobabtech/waterconflict/tree/main/classifier  
+**PyPI:** https://pypi.org/project/water-conflict-classifier/
+
 ### Quick Start
 
 ```python
 from setfit import SetFitModel
 
-# Load the model
+# Load the trained model from HF Hub
 model = SetFitModel.from_pretrained("{model_repo}")
 
 # Predict on headlines
@@ -219,7 +236,30 @@ https://acleddata.com/
 
 This model is part of experimental research supporting the Pacific Institute's Water Conflict Chronology project. The Pacific Institute maintains the world's most comprehensive open-source record of water-related conflicts, documenting over 2,700 events across 4,500 years of history.
 
-Learn more: https://www.worldwater.org/water-conflict/
+**Project Links:**
+- Pacific Institute Water Conflict Chronology: https://www.worldwater.org/water-conflict/
+- Python Package (PyPI): https://pypi.org/project/water-conflict-classifier/
+- Source Code: https://github.com/baobabtech/waterconflict
+- Model Hub: https://huggingface.co/{model_repo}
+
+### Training Your Own Model
+
+You can train your own version using the published package:
+
+```bash
+# Install package
+pip install water-conflict-classifier
+
+# Or install from source for development
+git clone https://github.com/baobabtech/waterconflict.git
+cd waterconflict/classifier
+pip install -e .
+
+# Train locally
+python train_setfit_headline_classifier.py
+```
+
+For cloud training on HuggingFace Jobs infrastructure, see the scripts folder in the repository.
 
 ## 📜 License
 
