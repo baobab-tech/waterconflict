@@ -140,7 +140,7 @@ python upload_datasets.py
 - Loads `../data/positives.csv`
 - Checks for `../data/negatives_updated.csv` (with hard negatives), falls back to `negatives.csv` if not found
 - Creates/updates HF Hub dataset repository
-- Uploads files to `YOUR_ORG/water-conflict-training-data`
+- Uploads files to `YOUR_ORG/water-conflict-source-data` (source dataset)
 - Shows dataset composition (hard negatives vs ACLED negatives)
 
 **Requirements:**
@@ -169,9 +169,9 @@ MODEL_VERSION=v2.0 hf jobs uv run ... scripts/train_on_hf.py
 ```
 
 **What it does:**
-- Downloads training data from HF Hub
+- Downloads source data from HF Hub (`org/water-conflict-source-data`)
 - Applies stratified sampling to ensure balanced label representation
-- **Uploads versioned training dataset** - Creates a separate dataset showing the exact sampled data used for training (e.g., `org/water-conflict-training-data-v0.1.0`)
+- **Uploads versioned training dataset** - Uploads sampled data to `org/water-conflict-training-data` with git tag for version (uses HF's built-in versioning like models)
 - Trains SetFit model on GPU infrastructure
 - Evaluates on held-out test set
 - Pushes trained model to HF Hub with model card

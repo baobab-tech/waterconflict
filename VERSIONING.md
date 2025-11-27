@@ -87,7 +87,7 @@ Difference: +0.0531 (+6.45%)
 ### Automatic Tagging & Dataset Versioning
 
 When training with `train_on_hf.py`, the script automatically:
-1. Uploads versioned training dataset (e.g., `org/water-conflict-training-data-v1.0`)
+1. Uploads versioned training dataset to `org/water-conflict-training-data` with git tag (e.g., `v1.0`)
 2. Trains model and pushes to HF Hub
 3. Creates a git tag on your HF Hub model repository
 4. Uploads evaluation results to evals dataset
@@ -115,7 +115,7 @@ model_v12 = SetFitModel.from_pretrained(
 )
 
 # Load the exact training data used for a specific version
-training_data_v10 = load_dataset("your-org/water-conflict-training-data-v1.0")
+training_data_v10 = load_dataset("your-org/water-conflict-training-data", revision="v1.0")
 train_split = training_data_v10['train']  # Training samples
 test_split = training_data_v10['test']    # Test samples
 ```
@@ -163,8 +163,8 @@ Experiments are logged to `experiment_history.jsonl` in JSON Lines format:
   },
   "metadata": {
     "model_repo": "baobabtech/water-conflict-classifier",
-    "dataset_repo": "baobabtech/water-conflict-training-data",
-    "training_dataset_repo": "baobabtech/water-conflict-training-data-v1.0"
+    "source_dataset_repo": "baobabtech/water-conflict-source-data",
+    "training_dataset_repo": "baobabtech/water-conflict-training-data"
   }
 }
 ```
@@ -178,14 +178,17 @@ Each training run creates a separate versioned dataset on HF Hub containing:
 - **test.csv**: The held-out test set
 - **README.md**: Dataset card with sampling configuration and metadata
 
-### Dataset Naming
+### Dataset Naming & Versioning
 
-Versioned datasets follow the pattern: `{org}/{base-dataset-name}-v{version}`
+Training datasets use HuggingFace's built-in git tagging system (like models):
+- **Single repository**: `{org}/water-conflict-training-data`
+- **Versions via tags**: Access specific versions using the `revision` parameter
 
 Example:
-- Base dataset: `baobabtech/water-conflict-training-data`
+- Source dataset (large, unsampled): `baobabtech/water-conflict-source-data`
+- Training dataset: `baobabtech/water-conflict-training-data`
 - Model version: `v1.0`
-- Training dataset: `baobabtech/water-conflict-training-data-v1.0`
+- Access training data for v1.0: `load_dataset("baobabtech/water-conflict-training-data", revision="v1.0")`
 
 ### Why This Matters
 
@@ -203,8 +206,11 @@ Example:
 ```python
 from datasets import load_dataset
 
-# Load training dataset for a specific model version
-dataset = load_dataset("your-org/water-conflict-training-data-v1.0")
+# Load latest training dataset
+dataset = load_dataset("your-org/water-conflict-training-data")
+
+# Load training dataset for a specific model version using revision
+dataset = load_dataset("your-org/water-conflict-training-data", revision="v1.0")
 
 # Access splits
 train_data = dataset['train']
@@ -365,9 +371,9 @@ python scripts/view_experiments.py --compare v1.0 v1.1
 
 # 5. Push to HF Hub with versioning
 uv run scripts/train_on_hf.py
-# → Creates versioned training dataset (org/water-conflict-training-data-v1.2)
+# → Uploads training dataset with tag v1.2 to org/water-conflict-training-data
 # → Trains and uploads model
-# → Logs as v1.2 + creates HF Hub tag
+# → Logs as v1.2 + creates HF Hub tags (model & dataset)
 # → Uploads evals to comparison dataset
 
 # 6. Later, load specific version and its training data
@@ -375,7 +381,7 @@ python
 >>> from setfit import SetFitModel
 >>> from datasets import load_dataset
 >>> model = SetFitModel.from_pretrained("org/model", revision="v1.2")
->>> training_data = load_dataset("org/water-conflict-training-data-v1.2")
+>>> training_data = load_dataset("org/water-conflict-training-data", revision="v1.2")
 ```
 
 ## Next Steps

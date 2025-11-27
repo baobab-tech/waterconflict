@@ -24,7 +24,7 @@ project_root = Path(__file__).parent.parent  # scripts/ -> waterconflict/
 sys.path.insert(0, str(project_root))
 
 try:
-    from config import HF_ORGANIZATION, DATASET_REPO_NAME
+    from config import HF_ORGANIZATION, SOURCE_DATASET_REPO_NAME
 except ImportError:
     print("\n✗ config.py not found in project root!")
     print("  Copy config.sample.py to config.py and update with your org/username\n")
@@ -49,8 +49,8 @@ def main():
         print("\n✗ Not authenticated! Please run: hf auth login")
         sys.exit(1)
     
-    # Full repo ID
-    repo_id = f"{HF_ORGANIZATION}/{DATASET_REPO_NAME}"
+    # Full repo ID (source dataset - large, unsampled)
+    repo_id = f"{HF_ORGANIZATION}/{SOURCE_DATASET_REPO_NAME}"
     print(f"  Target: {repo_id}")
     
     # Create repository
@@ -268,7 +268,7 @@ If you use this dataset, please cite the original ACLED data source.
     print("=" * 80)
     print(f"\nDataset available at: https://huggingface.co/datasets/{repo_id}")
     print(f"\nTo use in training script:")
-    print(f"  DATASET_REPO = '{repo_id}'")
+    print(f"  SOURCE_DATASET_REPO = '{repo_id}'")
     print("\n⚠️  Note: After upload, HF may need a few minutes to process the dataset.")
     print("   If the viewer still shows errors, try clicking 'Refresh' on the dataset page.")
     print("\n")

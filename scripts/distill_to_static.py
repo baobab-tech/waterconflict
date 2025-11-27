@@ -184,22 +184,22 @@ def main():
                         break
             
             if version:
-                print(f"  Detected model version: {version}")
-                # Try to load versioned training dataset
+                print(f"  Detected model version: v{version}")
+                # Try to load training dataset with version tag
                 org = args.model_id.split('/')[0]
-                # Strip 'v' prefix if present to avoid double-v (version is already "v1.0" format)
-                version_suffix = version.lstrip('v')
-                versioned_dataset_repo = f"{org}/water-conflict-training-data-v{version_suffix}"
+                training_dataset_repo = f"{org}/water-conflict-training-data"
+                version_tag = f"v{version}"
                 
                 try:
                     train_csv_path = hf_hub_download(
-                        repo_id=versioned_dataset_repo,
+                        repo_id=training_dataset_repo,
                         filename="train.csv",
-                        repo_type="dataset"
+                        repo_type="dataset",
+                        revision=version_tag
                     )
                     
                     data = pd.read_csv(train_csv_path)
-                    print(f"  ✓ Loaded versioned training dataset: {versioned_dataset_repo}")
+                    print(f"  ✓ Loaded training dataset: {training_dataset_repo} @ {version_tag}")
                     
                     # Parse labels column (stored as string representation of list)
                     if isinstance(data['labels'].iloc[0], str):
@@ -212,17 +212,17 @@ def main():
                     
                 except Exception as e:
                     print(f"  ⚠ Could not load versioned dataset: {e}")
-                    print(f"  → Falling back to base dataset")
-                    raise  # Fall through to base dataset loading
+                    print(f"  → Falling back to source dataset")
+                    raise  # Fall through to source dataset loading
             else:
                 raise Exception("No version found in model tags")
                 
         except Exception as e:
             print(f"  ⚠ Could not load versioned dataset: {e}")
-            print(f"  → Loading from base dataset: baobabtech/water-conflict-training-data")
+            print(f"  → Loading from source dataset: baobabtech/water-conflict-source-data")
             
-            # Fallback: Download and load the CSV files from base HF Hub dataset
-            dataset_repo = "baobabtech/water-conflict-training-data"
+            # Fallback: Download and load the CSV files from source HF Hub dataset
+            dataset_repo = "baobabtech/water-conflict-source-data"
             positives_path = hf_hub_download(
                 repo_id=dataset_repo,
                 filename="positives.csv",

@@ -86,7 +86,8 @@ from huggingface_hub import create_repo
 # ============================================================================
 
 HF_ORGANIZATION = os.environ.get("HF_ORGANIZATION")
-DATASET_REPO_NAME = os.environ.get("DATASET_REPO_NAME", "water-conflict-training-data")
+SOURCE_DATASET_REPO_NAME = os.environ.get("SOURCE_DATASET_REPO_NAME", "water-conflict-source-data")
+TRAINING_DATASET_REPO_NAME = os.environ.get("TRAINING_DATASET_REPO_NAME", "water-conflict-training-data")
 MODEL_REPO_NAME = os.environ.get("MODEL_REPO_NAME", "water-conflict-classifier")
 EVALS_REPO_NAME = os.environ.get("EVALS_REPO_NAME", "water-conflict-classifier-evals")
 
@@ -95,7 +96,8 @@ if not HF_ORGANIZATION:
     print("  Set HF_ORGANIZATION environment variable\n")
     sys.exit(1)
 
-DATASET_REPO = f"{HF_ORGANIZATION}/{DATASET_REPO_NAME}"
+SOURCE_DATASET_REPO = f"{HF_ORGANIZATION}/{SOURCE_DATASET_REPO_NAME}"
+TRAINING_DATASET_REPO = f"{HF_ORGANIZATION}/{TRAINING_DATASET_REPO_NAME}"
 MODEL_REPO = f"{HF_ORGANIZATION}/{MODEL_REPO_NAME}"
 EVALS_REPO = f"{HF_ORGANIZATION}/{EVALS_REPO_NAME}"
 
@@ -122,36 +124,31 @@ EXPERIMENT_HISTORY_FILE = "experiment_history.jsonl"
 def upload_training_dataset(train_data: pd.DataFrame, 
                             test_data: pd.DataFrame,
                             version: str,
-                            base_dataset_repo: str,
+                            training_dataset_repo: str,
+                            source_dataset_repo: str,
                             sampling_config: dict) -> str:
     """
-    Upload the actual sampled training dataset to HF Hub.
+    Upload the actual sampled training dataset to HF Hub with version tag.
     
-    Creates a versioned dataset showing exactly what data was used for training.
+    Uses a single dataset repo with git tags for versions (like HF models).
     
     Args:
         train_data: Training split DataFrame
         test_data: Test split DataFrame
-        version: Model version (e.g. "0.1.0")
-        base_dataset_repo: Original dataset repo (e.g. "org/water-conflict-training-data")
+        version: Model version (e.g. "v0.1.0")
+        training_dataset_repo: Training dataset repo (e.g. "org/water-conflict-training-data")
+        source_dataset_repo: Source dataset repo (e.g. "org/water-conflict-source-data")
         sampling_config: Dict with sampling parameters
         
     Returns:
         Repository ID of uploaded dataset
     """
-    # Create versioned dataset repo name
-    org = base_dataset_repo.split('/')[0]
-    base_name = base_dataset_repo.split('/')[1]
-    # Strip 'v' prefix if present to avoid double-v (version is already "v1.0" format)
-    version_suffix = version.lstrip('v')
-    versioned_repo = f"{org}/{base_name}-v{version_suffix}"
+    print(f"  Uploading to: {training_dataset_repo} (version {version})")
     
-    print(f"  Uploading to: {versioned_repo}")
-    
-    # Create dataset repo
+    # Create dataset repo (if doesn't exist)
     try:
         create_repo(
-            repo_id=versioned_repo,
+            repo_id=training_dataset_repo,
             repo_type="dataset",
             exist_ok=True,
             private=False
@@ -168,18 +165,22 @@ def upload_training_dataset(train_data: pd.DataFrame,
     train_data.to_csv(train_path, index=False)
     test_data.to_csv(test_path, index=False)
     
+    commit_message = f"Upload training data for model {version}"
+    
     api.upload_file(
         path_or_fileobj=train_path,
         path_in_repo="train.csv",
-        repo_id=versioned_repo,
+        repo_id=training_dataset_repo,
         repo_type="dataset",
+        commit_message=commit_message,
     )
     
     api.upload_file(
         path_or_fileobj=test_path,
         path_in_repo="test.csv",
-        repo_id=versioned_repo,
+        repo_id=training_dataset_repo,
         repo_type="dataset",
+        commit_message=commit_message,
     )
     
     # Create dataset card
@@ -191,18 +192,41 @@ tags:
 license: cc-by-nc-4.0
 ---
 
-# Water Conflict Training Dataset - {version}
+# Water Conflict Training Dataset
 
-This dataset contains the **actual sampled data** used to train model version `{version}`.
+This dataset contains the **actual sampled training data** used for the water conflict classifier.
+
+**Current Version**: {version}
+
+To load a specific version, use the `revision` parameter (e.g., `revision="{version}"`).
 
 ## Dataset Details
 
-- **Parent Dataset**: [{base_dataset_repo}](https://huggingface.co/datasets/{base_dataset_repo})
-- **Model Version**: {version}
+- **Source Dataset**: [{source_dataset_repo}](https://huggingface.co/datasets/{source_dataset_repo})
+- **Latest Version**: {version}
 - **Train Samples**: {len(train_data)}
 - **Test Samples**: {len(test_data)}
 
-## Sampling Configuration
+## Versioning
+
+This dataset is versioned using git tags, similar to how HuggingFace models work. Each model version has a corresponding dataset version.
+
+### Load Specific Version
+
+```python
+from datasets import load_dataset
+
+# Load latest version
+dataset = load_dataset("{training_dataset_repo}")
+
+# Load specific version
+dataset = load_dataset("{training_dataset_repo}", revision="{version}")
+
+train = dataset['train']
+test = dataset['test']
+```
+
+## Sampling Configuration (Version {version})
 
 ```python
 {sampling_config}
@@ -210,38 +234,46 @@ This dataset contains the **actual sampled data** used to train model version `{
 
 ## Splits
 
-- `train.csv`: Training samples (stratified sample from parent dataset)
+- `train.csv`: Training samples (stratified sample from source dataset)
 - `test.csv`: Test samples (held-out evaluation set)
 
 ## Labels
 
 Multi-label classification with labels: {LABEL_NAMES}
 
-## Usage
-
-```python
-from datasets import load_dataset
-
-dataset = load_dataset("{versioned_repo}")
-train = dataset['train']
-test = dataset['test']
-```
-
 ## Reproducibility
 
-This dataset represents the exact data used to train the model, ensuring full reproducibility.
-Parent dataset was sampled using stratified sampling to ensure balanced label representation.
+This dataset uses git tags/revisions to track exactly what data was used to train each model version.
+The source dataset is sampled using stratified sampling to ensure balanced label representation.
+
+## Version History
+
+View all versions at: https://huggingface.co/datasets/{training_dataset_repo}/tags
 """
     
     api.upload_file(
         path_or_fileobj=dataset_card.encode(),
         path_in_repo="README.md",
-        repo_id=versioned_repo,
+        repo_id=training_dataset_repo,
         repo_type="dataset",
+        commit_message=commit_message,
     )
     
-    print(f"  ✓ Dataset uploaded: https://huggingface.co/datasets/{versioned_repo}")
-    return versioned_repo
+    # Create git tag for this version
+    try:
+        api.create_tag(
+            repo_id=training_dataset_repo,
+            repo_type="dataset",
+            tag=version,
+            tag_message=f"Training data for model version {version}",
+        )
+        print(f"  ✓ Created dataset tag: {version}")
+    except Exception as e:
+        print(f"  ⚠ Could not create tag (may already exist): {e}")
+    
+    print(f"  ✓ Dataset uploaded: https://huggingface.co/datasets/{training_dataset_repo}")
+    print(f"  ✓ Version: {version}")
+    return training_dataset_repo
 
 # ============================================================================
 # AUTHENTICATION
@@ -278,7 +310,7 @@ def main():
     
     # Step 1: Load data
     print("\n[1/8] Loading data from Hugging Face Hub...")
-    positives, negatives = load_hub_data(DATASET_REPO)
+    positives, negatives = load_hub_data(SOURCE_DATASET_REPO)
     
     # Step 2: Preprocess
     print("\n[2/8] Preprocessing data...")
@@ -356,7 +388,8 @@ def main():
         train_data=train_data,
         test_data=test_data,
         version=version,
-        base_dataset_repo=DATASET_REPO,
+        training_dataset_repo=TRAINING_DATASET_REPO,
+        source_dataset_repo=SOURCE_DATASET_REPO,
         sampling_config=sampling_config
     )
     
@@ -464,7 +497,7 @@ def main():
             metrics=eval_results,
             metadata={
                 "model_repo": MODEL_REPO,
-                "dataset_repo": DATASET_REPO,
+                "source_dataset_repo": SOURCE_DATASET_REPO,
                 "training_dataset_repo": training_dataset_repo,
             }
         )
@@ -487,7 +520,7 @@ def main():
             metrics=eval_results,
             metadata={
                 "model_repo": MODEL_REPO,
-                "dataset_repo": DATASET_REPO,
+                "source_dataset_repo": SOURCE_DATASET_REPO,
                 "training_dataset_repo": training_dataset_repo,
             }
         )
