@@ -122,7 +122,7 @@ Multi-label SetFit classifier for identifying water-related conflict events in n
 
 **Key Features:**
 - Few-shot learning optimized (SetFit)
-- ~33M parameters (BAAI/bge-small-en-v1.5)
+- Small, efficient models (e.g., BAAI/bge-small-en-v1.5 with ~33M parameters)
 - Fast inference (~5-10ms per headline on CPU)
 - Published Python package
 
@@ -162,7 +162,7 @@ Licensed under [Creative Commons Attribution-NonCommercial 4.0 International (CC
 
 ## Frugal AI Philosophy
 
-This project demonstrates intentional "frugal AI" - using a small, efficient model (~33M parameters) fine-tuned on limited data (~600 examples) instead of defaulting to massive LLMs (100B+ parameters) for simple classification tasks.
+This project demonstrates intentional "frugal AI" - using small, efficient models (e.g., ~33M parameters) fine-tuned on limited data (~600 examples) instead of defaulting to massive LLMs (100B+ parameters) for simple classification tasks.
 
 **Why this matters:** Properly fine-tuned small models can achieve comparable accuracy to trillion-parameter models for targeted tasks, while using a fraction of compute resources and reducing environmental impact.
 

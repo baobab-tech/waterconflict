@@ -33,13 +33,13 @@ predictions = model.predict(["Taliban attack workers at dam"])
 
 ## Frugal AI: Training with Limited Data
 
-This classifier demonstrates an intentional approach to building AI systems with **limited data** using [SetFit](https://huggingface.co/docs/setfit/en/index) - a framework for few-shot learning with sentence transformers. Rather than defaulting to massive language models (GPT, Claude, or 100B+ parameter models) for simple classification tasks, we fine-tune a small, efficient model (~33M parameters) on a focused dataset.
+This classifier demonstrates an intentional approach to building AI systems with **limited data** using [SetFit](https://huggingface.co/docs/setfit/en/index) - a framework for few-shot learning with sentence transformers. Rather than defaulting to massive language models (GPT, Claude, or 100B+ parameter models) for simple classification tasks, we fine-tune small, efficient models (e.g., BAAI/bge-small-en-v1.5 with ~33M parameters) on a focused dataset.
 
 **Why this matters:** The industry has normalized using trillion-parameter models to classify headlines, answer simple questions, or categorize text - tasks that don't require world knowledge, reasoning, or generative capabilities. This is computationally wasteful and environmentally costly. A properly fine-tuned small model can achieve comparable or better accuracy while using a fraction of the compute resources.
 
 **Our approach:**
 - Train on ~600 examples (few-shot learning with SetFit)
-- Deploy a 33M parameter model vs. 100B-1T parameter alternatives
+- Deploy small parameter models (e.g., ~33M params) vs. 100B-1T parameter alternatives
 - Achieve specialized task performance without the overhead of general-purpose LLMs
 - Reduce inference costs and latency by orders of magnitude
 

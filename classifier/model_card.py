@@ -4,6 +4,51 @@ Model card generation for water conflict classifier.
 Creates comprehensive model cards with training details and evaluation metrics.
 """
 
+import requests
+from typing import Optional
+
+
+def get_base_model_info(model_id: str) -> dict:
+    """
+    Fetch base model information from HuggingFace API.
+    
+    Args:
+        model_id: HuggingFace model ID (e.g. 'sentence-transformers/all-mpnet-base-v2')
+        
+    Returns:
+        Dictionary with 'params' (int) and 'size_mb' (int) keys
+    """
+    try:
+        url = f"https://huggingface.co/api/models/{model_id}/revision/main"
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        
+        # Extract parameter count from safetensors info
+        total_params = 0
+        if 'safetensors' in data and 'parameters' in data['safetensors']:
+            total_params = data['safetensors'].get('total', 0)
+        
+        # Format parameter count (e.g., 109486978 -> "109M")
+        params_formatted = f"{total_params / 1_000_000:.0f}M" if total_params > 0 else "33M"
+        
+        # Estimate size in MB (rough estimate: 4 bytes per param for float32)
+        size_mb = int(total_params * 4 / 1_000_000) if total_params > 0 else 130
+        
+        return {
+            'params': params_formatted,
+            'params_raw': total_params,
+            'size_mb': size_mb
+        }
+    except Exception as e:
+        print(f"Warning: Could not fetch model info from HF API: {e}")
+        # Fallback to defaults
+        return {
+            'params': '33M',
+            'params_raw': 33_000_000,
+            'size_mb': 130
+        }
+
 
 def generate_model_card(model_repo: str,
                        base_model: str,
@@ -14,10 +59,10 @@ def generate_model_card(model_repo: str,
                        batch_size: int,
                        num_epochs: int,
                        test_split: float,
-                       full_train_size: int = None,
+                       full_train_size: Optional[int] = None,
                        num_iterations: int = 20,
                        sampling_strategy: str = "oversampling",
-                       evals_repo: str = None) -> str:
+                       evals_repo: Optional[str] = None) -> str:
     """
     Generate comprehensive model card with evaluation results.
     
@@ -41,6 +86,9 @@ def generate_model_card(model_repo: str,
     """
     overall = eval_results['overall']
     per_label = eval_results['per_label']
+    
+    # Fetch base model info from HF API
+    model_info = get_base_model_info(base_model)
     
     # Handle sampling info
     training_info = f"{train_size} examples"
@@ -73,7 +121,7 @@ widget:
 
 ## 🔬 Experimental Research
 
-> **Note:** This is experimental research to potentially support the Pacific Institute's [Water Conflict Chronology](https://www.worldwater.org/water-conflict/) project, which tracks water-related conflicts spanning over 4,500 years of human history.
+> **Note:** This experimental research draws on Pacific Institute's [Water Conflict Chronology](https://www.worldwater.org/water-conflict/), which tracks water-related conflicts spanning over 4,500 years of human history. The work is conducted independently and is not affiliated with Pacific Institute.
 
 This model is designed to assist researchers in classifying water-related conflict events. 
 
@@ -81,13 +129,13 @@ The Pacific Institute maintains the world's most comprehensive open-source recor
 
 ## 🌱 Frugal AI: Training with Limited Data
 
-This classifier demonstrates an intentional approach to building AI systems with **limited data** using [SetFit](https://huggingface.co/docs/setfit/en/index) - a framework for few-shot learning with sentence transformers. Rather than defaulting to massive language models (GPT, Claude, or 100B+ parameter models) for simple classification tasks, we fine-tune a small, efficient model (~33M parameters) on a focused dataset.
+This classifier demonstrates an intentional approach to building AI systems with **limited data** using [SetFit](https://huggingface.co/docs/setfit/en/index) - a framework for few-shot learning with sentence transformers. Rather than defaulting to massive language models (GPT, Claude, or 100B+ parameter models) for simple classification tasks, we fine-tune small, efficient models (e.g., BAAI/bge-small-en-v1.5 with ~33M parameters) on a focused dataset.
 
 **Why this matters:** The industry has normalized using trillion-parameter models to classify headlines, answer simple questions, or categorize text - tasks that don't require world knowledge, reasoning, or generative capabilities. This is computationally wasteful and environmentally costly. A properly fine-tuned small model can achieve comparable or better accuracy while using a fraction of the compute resources.
 
 **Our approach:**
 - Train on ~600 examples (few-shot learning with SetFit)
-- Deploy a 33M parameter model vs. 100B-1T parameter alternatives
+- Deploy small parameter models (e.g., ~33M params) vs. 100B-1T parameter alternatives
 - Achieve specialized task performance without the overhead of general-purpose LLMs
 - Reduce inference costs and latency by orders of magnitude
 
@@ -105,13 +153,13 @@ These categories align with the Pacific Institute's Water Conflict Chronology fr
 
 ## 🏗️ Model Details
 
-- **Base Model**: {base_model} (33.4M parameters)
+- **Base Model**: [{base_model}](https://huggingface.co/{base_model})
 - **Architecture**: SetFit with One-vs-Rest multi-label strategy
 - **Training Approach**: Few-shot learning optimized (SetFit reaches peak performance with small samples)
 - **Training samples**: {training_info}
 - **Test samples**: {test_size} (held-out, never seen during training)
 - **Training time**: ~2-5 minutes on A10G GPU
-- **Model size**: ~130MB
+- **Model size**: {model_info['params']} Parameters, ~{model_info['size_mb']}MB
 - **Inference speed**: ~5-10ms per headline on CPU
 
 ## 💻 Usage
@@ -221,7 +269,7 @@ Evaluated on a held-out test set of {test_size} samples ({test_split*100:.0f}% o
 
 - **Training samples**: {train_size} examples
 - **Test samples**: {test_size} examples (held-out before sampling)
-- **Base model**: {base_model} (33.4M params)
+- **Base model**: {base_model} ({model_info['params']} params)
 - **Batch size**: {batch_size}
 - **Epochs**: {num_epochs}
 - **Iterations**: {num_iterations} (contrastive pair generation)
@@ -259,7 +307,7 @@ https://acleddata.com/
 
 ## 🌍 About This Project
 
-This model is part of experimental research supporting the Pacific Institute's Water Conflict Chronology project. The Pacific Institute maintains the world's most comprehensive open-source record of water-related conflicts, documenting over 2,700 events across 4,500 years of history.
+This model is part of independent experimental research drawing on the Pacific Institute's Water Conflict Chronology. The Pacific Institute maintains the world's most comprehensive open-source record of water-related conflicts, documenting over 2,700 events across 4,500 years of history.
 
 **Project Links:**
 - Pacific Institute Water Conflict Chronology: https://www.worldwater.org/water-conflict/
@@ -300,7 +348,6 @@ This work is licensed under the [Creative Commons Attribution-NonCommercial 4.0 
 - **Attribution** — You must give appropriate credit to Baobab Tech, provide a link to the license, and indicate if changes were made
 - **NonCommercial** — You may not use the material for commercial purposes
 
-For commercial licensing inquiries, please contact Baobab Tech.
 
 ## 📝 Citation
 
@@ -309,7 +356,7 @@ If you use this model in your work, please cite:
 ```bibtex
 @misc{{waterconflict2025,
   title={{Water Conflict Multi-Label Classifier}},
-  author={{Experimental Research Supporting Pacific Institute Water Conflict Chronology}},
+  author={{Independent Experimental Research Drawing on Pacific Institute Water Conflict Chronology}},
   year={{2025}},
   howpublished={{\\url{{https://huggingface.co/{model_repo}}}}},
   note={{Training data from Pacific Institute Water Conflict Chronology and ACLED}}
@@ -329,8 +376,6 @@ Please also cite the Pacific Institute's Water Conflict Chronology:
 }}
 ```
 
-**Recommended citation format:**  
-Pacific Institute (2025) Water Conflict Chronology. Pacific Institute, Oakland, CA. https://www.worldwater.org/water-conflict/. Accessed: (access date).
 """
     
     return model_card

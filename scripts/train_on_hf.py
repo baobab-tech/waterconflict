@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # /// script
 # dependencies = [
-#     "water-conflict-classifier>=0.1.10",
+#     "water-conflict-classifier>=0.1.11",
 #     # For development/testing before PyPI publish, use:
 #     # "water-conflict-classifier @ git+https://github.com/yourusername/waterconflict.git#subdirectory=classifier",
 # ]
@@ -58,7 +58,7 @@ from evals_upload import upload_eval_results
 
 HF_ORGANIZATION = os.environ.get("HF_ORGANIZATION")
 DATASET_REPO_NAME = os.environ.get("DATASET_REPO_NAME", "water-conflict-training-data")
-MODEL_REPO_NAME = os.environ.get("MODEL_REPO_NAME", "water-conflict-classifier")
+MODEL_REPO_NAME = os.environ.get("MODEL_REPO_NAME", "water-conflict-classifier-modernbert")
 EVALS_REPO_NAME = os.environ.get("EVALS_REPO_NAME", "water-conflict-classifier-evals")
 
 if not HF_ORGANIZATION:
@@ -71,7 +71,7 @@ MODEL_REPO = f"{HF_ORGANIZATION}/{MODEL_REPO_NAME}"
 EVALS_REPO = f"{HF_ORGANIZATION}/{EVALS_REPO_NAME}"
 
 # Training configuration
-BASE_MODEL = "BAAI/bge-small-en-v1.5"
+BASE_MODEL = "modernbert-embed-base" # "BAAI/bge-small-en-v1.5"
 USE_SAMPLE_TRAINING = True
 SAMPLE_SIZE = 1200  # Increased for better label representation, especially Weapon
 MIN_SAMPLES_PER_LABEL = 100  # Ensure each label gets sufficient training examples (especially Weapon ~292 available)
@@ -331,7 +331,7 @@ def main():
     print("TRAINING COMPLETE! 🎉")
     print("=" * 80)
     print(f"\nYour model is available at: https://huggingface.co/{MODEL_REPO}")
-    print("Model size: ~130MB")
+    print(f"Base model: {BASE_MODEL}")
     print("Inference speed: ~5-10ms per headline on CPU")
     print("\n")
 
