@@ -98,8 +98,38 @@ def main():
             print(f"    ✗ Error uploading {local_file}: {e}")
             sys.exit(1)
     
+    # Create dataset configuration file
+    print(f"\n[3/3] Creating dataset configuration file...")
+    
+    # First upload a dataset_infos.json to fix the type inference issue
+    dataset_info = """{
+  "default": {
+    "features": {
+      "Headline": {
+        "dtype": "string",
+        "_type": "Value"
+      },
+      "Basis": {
+        "dtype": "string",
+        "_type": "Value"
+      }
+    }
+  }
+}"""
+    
+    try:
+        api.upload_file(
+            path_or_fileobj=dataset_info.encode(),
+            path_in_repo="dataset_infos.json",
+            repo_id=repo_id,
+            repo_type=REPO_TYPE,
+        )
+        print(f"  ✓ dataset_infos.json created")
+    except Exception as e:
+        print(f"  ✗ Error creating dataset_infos.json: {e}")
+    
     # Create README for the dataset
-    print(f"\n[3/3] Creating dataset README...")
+    print(f"\n[4/4] Creating dataset README...")
     
     readme_content = f"""---
 license: mit
@@ -195,6 +225,8 @@ If you use this dataset, please cite the original ACLED data source.
     print(f"\nDataset available at: https://huggingface.co/datasets/{repo_id}")
     print(f"\nTo use in training script:")
     print(f"  DATASET_REPO = '{repo_id}'")
+    print("\n⚠️  Note: After upload, HF may need a few minutes to process the dataset.")
+    print("   If the viewer still shows errors, try clicking 'Refresh' on the dataset page.")
     print("\n")
 
 if __name__ == "__main__":
