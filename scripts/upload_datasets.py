@@ -124,7 +124,7 @@ This dataset contains labeled examples for training a multi-label water conflict
 ### Files
 
 - `positives.csv`: Water conflict headlines with labels (Trigger, Casualty, Weapon)
-- `negatives.csv`: Non-conflict news headlines (empty Basis column)
+- `negatives.csv`: Non-conflict news headlines (includes synthetic hard negatives)
 
 ### Data Format
 
@@ -154,6 +154,16 @@ Headline,Basis
 - **Trigger**: Water resource as conflict trigger
 - **Casualty**: Water infrastructure as casualty/target
 - **Weapon**: Water as weapon/tool of conflict
+
+## Hard Negatives
+
+The negatives dataset includes synthetic "hard negatives" - peaceful water-related news that superficially resembles water conflicts but lacks violence. These are critical for preventing false positives where the model might classify any water-related news as a conflict.
+
+Examples:
+- Water infrastructure projects (peaceful development)
+- Water research and technology breakthroughs
+- Water conservation initiatives and conferences
+- Environmental water management topics
 
 ## Usage
 

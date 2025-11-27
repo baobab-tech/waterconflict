@@ -40,6 +40,7 @@ waterconflict/
 │   └── See classifier/README.md for package details
 │
 ├── scripts/            # 🛠️ Utility Scripts (uses published package)
+│   ├── classify.py                  (demo: classify sample headlines)
 │   ├── transform_prep_negatives.py  (generate negative examples)
 │   ├── upload_datasets.py           (upload data to HF Hub)
 │   ├── train_on_hf.py               (cloud training with HF Jobs)
@@ -61,7 +62,17 @@ waterconflict/
 
 ## Quick Start
 
-### 1. Train Locally
+### 1. Try the Classifier (Demo)
+
+Run the demo script to classify 20 sample headlines with timing metrics:
+
+```bash
+python scripts/classify.py
+```
+
+This uses the published model from HuggingFace Hub and shows inference performance.
+
+### 2. Train Locally
 
 ```bash
 cd classifier
@@ -69,7 +80,7 @@ uv pip install -e .
 python train_setfit_headline_classifier.py
 ```
 
-### 2. Train on HF Jobs (Cloud)
+### 3. Train on HF Jobs (Cloud)
 
 The package is published to PyPI: [water-conflict-classifier](https://pypi.org/project/water-conflict-classifier/)
 
@@ -86,7 +97,7 @@ hf jobs uv run \
 
 See `scripts/README.md` for cloud training details and `classifier/README.md` for package documentation.
 
-### 3. Track Experiments & Compare Versions
+### 4. Track Experiments & Compare Versions
 
 All training runs are automatically versioned and logged:
 
@@ -117,9 +128,11 @@ Multi-label SetFit classifier for identifying water-related conflict events in n
 
 ### [Scripts](scripts/)
 Utility scripts that use the published package:
+- Demo classifier on sample headlines (`classify.py`)
 - Generate negative examples from ACLED data (`transform_prep_negatives.py`)
 - Upload datasets to Hugging Face Hub (`upload_datasets.py`)
 - Train on HF Jobs cloud infrastructure (`train_on_hf.py`)
+- Compare training experiments (`view_experiments.py`)
 
 **See:** `scripts/README.md`
 
@@ -131,8 +144,10 @@ Tools for analyzing Armed Conflict Location & Event Data (ACLED) to understand c
 **Positive Examples:** Pacific Institute Water Conflict Chronology  
 https://www.worldwater.org/water-conflict/
 
-**Negative Examples:** Armed Conflict Location & Event Data Project (ACLED)  
+**Negative Examples:** Armed Conflict Location & Event Data Project (ACLED) + synthetic hard negatives  
 https://acleddata.com/
+
+**Hard Negatives:** Synthetic peaceful water-related news to prevent false positives (e.g., water infrastructure projects, research, conservation initiatives)
 
 ## License
 

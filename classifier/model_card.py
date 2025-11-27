@@ -232,6 +232,8 @@ https://www.worldwater.org/water-conflict/
 Armed Conflict Location & Event Data Project (ACLED).  
 https://acleddata.com/
 
+**Note:** Training negatives include synthetic "hard negatives" - peaceful water-related news (e.g., "New desalination plant opens", "Water conservation conference") to prevent false positives on non-conflict water topics.
+
 ## 🌍 About This Project
 
 This model is part of experimental research supporting the Pacific Institute's Water Conflict Chronology project. The Pacific Institute maintains the world's most comprehensive open-source record of water-related conflicts, documenting over 2,700 events across 4,500 years of history.

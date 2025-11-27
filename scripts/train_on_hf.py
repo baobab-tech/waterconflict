@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # /// script
 # dependencies = [
-#     "water-conflict-classifier>=0.1.4",
+#     "water-conflict-classifier>=0.1.5",
 #     # For development/testing before PyPI publish, use:
 #     # "water-conflict-classifier @ git+https://github.com/yourusername/waterconflict.git#subdirectory=classifier",
 # ]

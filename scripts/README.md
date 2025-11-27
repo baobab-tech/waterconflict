@@ -65,6 +65,24 @@ python transform_prep_negatives.py
 
 ---
 
+### `generate_hard_negatives.py`
+Generate synthetic "hard negatives" - peaceful water-related news to prevent false positives.
+
+**Usage:**
+```bash
+cd scripts
+python generate_hard_negatives.py
+```
+
+**What it does:**
+- Generates ~120 peaceful water-related headlines (infrastructure, research, conservation)
+- Creates `../data/hard_negatives.csv`
+- Optionally merges with existing `negatives.csv`
+
+**Why needed:** Without hard negatives, the model learns "water = conflict" instead of "water + violence = conflict". Hard negatives teach it to distinguish peaceful water news from actual conflicts.
+
+---
+
 ### `upload_datasets.py`
 Upload training datasets to Hugging Face Hub.
 
