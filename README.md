@@ -168,6 +168,8 @@ This project demonstrates intentional "frugal AI" - using a small, efficient mod
 
 ## Contact
 
-For questions about this research or commercial licensing:
-**Baobab Tech**
+For questions about this research:
 
+**Olivier Mills**
+- Website: [baobabtech.ai](https://baobabtech.ai)
+- LinkedIn: [Olivier Mills](https://www.linkedin.com/in/oliviermills/)
