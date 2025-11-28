@@ -6,10 +6,10 @@ Experimental research tools to potentially support the [Pacific Institute's Wate
 
 ## Usage
 
-Install and use the trained classifier:
+Install setfit and use the trained classifier:
 
 ```bash
-pip install water-conflict-classifier
+pip install setfit
 ```
 
 ```python

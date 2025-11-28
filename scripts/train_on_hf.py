@@ -362,11 +362,48 @@ def main():
     # Determine version first so we can version the dataset
     if AUTO_VERSION:
         is_major = VERSION_BUMP.lower() == "major"
-        version = get_next_version(
-            EXPERIMENT_HISTORY_FILE,
-            major=is_major,
-            minor=not is_major
-        )
+        # Query HF Hub for existing tags instead of local history file
+        try:
+            api = HfApi()
+            existing_tags = [ref.name for ref in api.list_repo_refs(MODEL_REPO, repo_type="model").tags]
+            if existing_tags:
+                # Parse version tags (format: v1.0, v1.1, etc.)
+                versions = []
+                for tag in existing_tags:
+                    if tag.startswith('v'):
+                        try:
+                            parts = tag.lstrip('v').split('.')
+                            major_num = int(parts[0])
+                            minor_num = int(parts[1]) if len(parts) > 1 else 0
+                            versions.append((major_num, minor_num, tag))
+                        except (ValueError, IndexError):
+                            continue
+                
+                if versions:
+                    # Get latest version
+                    versions.sort()
+                    last_major, last_minor, _ = versions[-1]
+                    
+                    if is_major:
+                        version = f"v{last_major + 1}.0"
+                    else:
+                        version = f"v{last_major}.{last_minor + 1}"
+                    print(f"  ✓ Latest version on Hub: v{last_major}.{last_minor}")
+                else:
+                    version = "v1.0"
+                    print(f"  ℹ No valid version tags found, starting at v1.0")
+            else:
+                version = "v1.0"
+                print(f"  ℹ No tags found on Hub, starting at v1.0")
+        except Exception as e:
+            # Fallback to local history file
+            print(f"  ⚠ Could not query Hub tags ({e}), falling back to local history")
+            version = get_next_version(
+                EXPERIMENT_HISTORY_FILE,
+                major=is_major,
+                minor=not is_major
+            )
+        
         bump_type = "major" if is_major else "minor"
         print(f"  Auto-generated version ({bump_type} bump): {version}")
     else:
