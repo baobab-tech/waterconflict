@@ -92,7 +92,7 @@ def upload_eval_results(
         row_data = {
             "version": version,
             "timestamp": datetime.now().isoformat(),
-            
+
             # Config fields
             "base_model": config.get("base_model"),
             "train_size": config.get("train_size"),
@@ -104,6 +104,13 @@ def upload_eval_results(
             "sampling_strategy": config.get("sampling_strategy"),
             "test_split": config.get("test_split"),
             "num_iterations": config.get("num_iterations"),
+
+            # Optuna-specific fields (optional, for hyperparameter search runs)
+            "training_type": config.get("training_type", "standard"),  # "standard" or "optuna"
+            "n_trials": config.get("n_trials"),  # Number of Optuna trials
+            "search_sample_size": config.get("search_sample_size"),  # Sample size used for HP search
+            "search_models": config.get("search_models"),  # Whether model search was enabled
+            "best_hyperparameters": str(config.get("best_hyperparameters")) if config.get("best_hyperparameters") else None,
             
             # Overall metrics (convert numpy types)
             "f1_micro": convert_value(metrics.get("overall", {}).get("f1_micro")),
@@ -221,6 +228,13 @@ This dataset tracks evaluation results and hyperparameter configurations across 
 - `sampling_strategy`: Strategy used (e.g., undersampling, oversampling)
 - `test_split`: Test set split ratio
 - `num_iterations`: SetFit contrastive pair iterations
+
+#### Optuna Hyperparameter Search (when training_type="optuna")
+- `training_type`: "standard" or "optuna"
+- `n_trials`: Number of Optuna trials run
+- `search_sample_size`: Sample size used for hyperparameter search
+- `search_models`: Whether model search was enabled
+- `best_hyperparameters`: JSON string of best hyperparameters found
 
 #### Overall Metrics
 - `f1_micro`: Micro-averaged F1 score

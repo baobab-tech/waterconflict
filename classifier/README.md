@@ -53,7 +53,8 @@ This is the **source code** for the `water-conflict-classifier` Python package, 
 classifier/
 ├── __init__.py                         # Package marker
 ├── data_prep.py                        # Data loading (for training-ready datasets)
-├── training_logic.py                   # Core training logic
+├── training_logic.py                   # Core training logic (fixed hyperparameters)
+├── training_logic_optuna.py            # Optuna hyperparameter search training
 ├── evaluation.py                       # Model evaluation & metrics
 ├── model_card.py                       # Model card generation
 ├── versioning.py                       # Experiment tracking & versioning
@@ -111,9 +112,11 @@ Model saved to `./water-conflict-classifier/`
 For training on HuggingFace Jobs (managed GPUs):
 
 1. **Prepare training dataset**: Use `../scripts/prepare_training_dataset.py` to preprocess, balance, and upload training-ready data to HF Hub
-2. **Train model**: Use `../scripts/train_on_hf.py` to train on HF Jobs infrastructure
+2. **Train model**: Two options:
+   - `../scripts/train_on_hf.py` - Standard training with fixed hyperparameters
+   - `../scripts/train_on_hf_optuna.py` - Optuna hyperparameter search (finds optimal settings automatically)
 
-The training script loads preprocessed data directly from HF Hub - no data preprocessing happens during training. This separation makes training reproducible and efficient.
+**Optuna training** searches on a small sample (~200 examples) for speed, then trains the final model on full data with best hyperparameters. Results are logged to the HF evals dataset for comparison.
 
 See the [scripts README](../scripts/README.md) for complete workflow.
 

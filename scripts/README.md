@@ -12,6 +12,7 @@ Scripts for data preparation, dataset management, cloud training, and experiment
 | | `upload_datasets.py` | Upload source data to HF Hub |
 | | `prepare_training_dataset.py` | Create training-ready dataset |
 | **🚀 Training** | `train_on_hf.py` | Train on HF Jobs (cloud GPUs) |
+| | `train_on_hf_optuna.py` | Train with Optuna hyperparameter search |
 | **⚡ Optimization** | `distill_to_static.py` | Create 50-500x faster static model |
 | | `inference_static.py` | Test the static model |
 | **📈 Analysis** | `view_experiments.py` | Compare training runs locally |
@@ -283,6 +284,41 @@ uv run scripts/train_on_hf.py
 ```
 
 Note: Still requires dataset on HF Hub and proper authentication.
+
+---
+
+### `train_on_hf_optuna.py`
+Train with Optuna hyperparameter search to find optimal settings automatically.
+
+**Usage:**
+```bash
+# Default: 50 trials, search on 200 samples, train final on full data
+hf jobs uv run \
+  --flavor a10g-large \
+  --timeout 2h \
+  --secrets HF_TOKEN \
+  --env HF_ORGANIZATION=your-org \
+  --namespace your-org \
+  scripts/train_on_hf_optuna.py
+
+# Quick search (20 trials)
+hf jobs uv run ... --env N_TRIALS=20 scripts/train_on_hf_optuna.py
+
+# Search across multiple base models
+hf jobs uv run ... --env SEARCH_MODELS=true --env N_TRIALS=100 scripts/train_on_hf_optuna.py
+```
+
+**Environment Variables:**
+- `N_TRIALS`: Number of Optuna trials (default: 50)
+- `SEARCH_SAMPLE_SIZE`: Samples for HP search (default: 200)
+- `SEARCH_MODELS`: Search across base models (default: false)
+
+**Strategy:**
+1. Searches hyperparameters on small sample (~200) for fast trials
+2. Trains final model on full dataset with best hyperparameters
+3. Logs results + best params to HF evals dataset
+
+**Hyperparameters searched:** learning rates, epochs, batch size, iterations, sampling strategy, LogisticRegression solver/max_iter.
 
 ---
 
