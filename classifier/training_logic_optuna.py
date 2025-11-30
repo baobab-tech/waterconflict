@@ -226,11 +226,13 @@ def train_model_with_optuna(
         return hp
 
     # Create trainer for hyperparameter search using SAMPLED data (fast)
+    # Note: metric_kwargs required for multi-label to avoid "average='binary'" error
     search_trainer = Trainer(
         train_dataset=search_train_dataset,  # Use small sample for search
         eval_dataset=eval_dataset,
         model_init=model_init,
         metric=metric,
+        metric_kwargs={"average": "micro"},  # Required for multi-label classification
         column_mapping={"text": "text", "labels": "label"}
     )
 
@@ -261,6 +263,7 @@ def train_model_with_optuna(
         eval_dataset=eval_dataset,
         model_init=model_init,
         metric=metric,
+        metric_kwargs={"average": "micro"},  # Required for multi-label classification
         column_mapping={"text": "text", "labels": "label"}
     )
 
@@ -329,6 +332,7 @@ def train_model_quick_search(
         eval_dataset=eval_dataset,
         model_init=model_init,
         metric="f1",
+        metric_kwargs={"average": "micro"},  # Required for multi-label classification
         column_mapping={"text": "text", "labels": "label"}
     )
 

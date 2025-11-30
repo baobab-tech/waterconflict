@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # /// script
 # dependencies = [
-#     "water-conflict-classifier>=0.1.21",
+#     "water-conflict-classifier>=0.1.22",
 #     "optuna>=3.0.0",
 # ]
 # ///

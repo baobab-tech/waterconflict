@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "water-conflict-classifier"
-version = "0.1.21"
+version = "0.1.22"
 description = "SetFit-based multi-label classifier for water-related conflict events"
 readme = "README.md"
 requires-python = ">=3.10"

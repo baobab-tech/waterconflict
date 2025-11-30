@@ -36,9 +36,12 @@ echo "✏️  Updating version in pyproject.toml..."
 CURRENT_TOML_VERSION=$(grep -E '^version = ' pyproject.toml | sed -E 's/version = "(.*)"/\1/')
 sed -i '' "s/version = \"$CURRENT_TOML_VERSION\"/version = \"$NEW_VERSION\"/" pyproject.toml
 
-# Update version in train_on_hf.py
+# Update version in training scripts
 echo "✏️  Updating version in ../scripts/train_on_hf.py..."
 sed -i '' "s/water-conflict-classifier>=.*/water-conflict-classifier>=$NEW_VERSION\",/" ../scripts/train_on_hf.py
+
+echo "✏️  Updating version in ../scripts/train_on_hf_optuna.py..."
+sed -i '' "s/water-conflict-classifier>=.*/water-conflict-classifier>=$NEW_VERSION\",/" ../scripts/train_on_hf_optuna.py
 
 # Clean old builds
 echo "🧹 Cleaning old builds..."
