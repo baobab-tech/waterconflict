@@ -41,12 +41,13 @@ def train_model(train_dataset: Dataset,
     print(f"  Base model: {base_model}")
     print(f"  Strategy: One-vs-Rest multi-label classification")
     
-    # Initialize model
+    # Initialize model with balanced class weights for minority class handling
     model = SetFitModel.from_pretrained(
         base_model,
         multi_target_strategy="one-vs-rest",
         labels=label_names,
-        model_card_data=model_card_data
+        model_card_data=model_card_data,
+        head_params={"class_weight": "balanced"}  # Handle class imbalance (esp. Weapon)
     )
     print("  ✓ Model initialized")
     
@@ -61,6 +62,8 @@ def train_model(train_dataset: Dataset,
         batch_size=batch_size,
         num_epochs=num_epochs,
         num_iterations=num_iterations,
+        body_learning_rate=2e-5,  # Slow fine-tuning of sentence transformer embeddings
+        head_learning_rate=1e-2,   # Faster training for classification head
         eval_strategy="epoch",
         save_strategy="epoch",
         load_best_model_at_end=True,

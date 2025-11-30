@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # /// script
 # dependencies = [
-#     "water-conflict-classifier>=0.1.19",
+#     "water-conflict-classifier>=0.1.20",
 #     # For development/testing before PyPI publish, use:
 #     # "water-conflict-classifier @ git+https://github.com/yourusername/waterconflict.git#subdirectory=classifier",
 # ]
@@ -115,9 +115,9 @@ MODEL_REPO = f"{HF_ORGANIZATION}/{MODEL_REPO_NAME}"
 EVALS_REPO = f"{HF_ORGANIZATION}/{EVALS_REPO_NAME}"
 
 # Training configuration
-BASE_MODEL = "BAAI/bge-small-en-v1.5" # "sentence-transformers/all-MiniLM-L6-v2" # 
-BATCH_SIZE = 64
-NUM_EPOCHS = 1  # SetFit best practice: ~1 epoch with pre-balanced data
+BASE_MODEL = "BAAI/bge-small-en-v1.5" # "sentence-transformers/all-MiniLM-L6-v2" #
+BATCH_SIZE = 16  # Smaller batches work better for ~1200 samples
+NUM_EPOCHS = 3   # SetFit best practice: 3-5 epochs for embedding fine-tuning
 NUM_ITERATIONS = 20
 
 # Versioning configuration
@@ -279,7 +279,7 @@ def main():
         batch_size=BATCH_SIZE,
         num_epochs=NUM_EPOCHS,
         num_iterations=NUM_ITERATIONS,
-        sampling_strategy="undersampling",
+        sampling_strategy="oversampling",  # Better for minority class (Weapon)
         model_card_data=model_card_data
     )
     
@@ -308,7 +308,7 @@ def main():
         batch_size=BATCH_SIZE,
         num_epochs=NUM_EPOCHS,
         num_iterations=NUM_ITERATIONS,
-        sampling_strategy="undersampling",
+        sampling_strategy="oversampling",  # Better for minority class (Weapon)
         evals_repo=EVALS_REPO,
         training_dataset_repo=TRAINING_DATASET_REPO,
         dataset_version=dataset_version
