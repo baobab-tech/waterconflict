@@ -340,7 +340,7 @@ def main():
         print("=" * 80)
         
         test_texts = [
-            "Taliban attack workers at the Kajaki Dam in Afghanistan",
+            "Militay group attack workers at the Kajaki Dam in Afghanistan",
             "New water treatment plant opens in California",
             "Violent protests erupt over dam construction in Sudan",
         ] * 10  # 30 texts total

@@ -13,7 +13,7 @@ Fast inference using distilled static model (50-500x faster than SetFit).
 
 Usage:
     # Predict from command line
-    uv run scripts/inference_static.py "Taliban attack workers at dam"
+    uv run scripts/inference_static.py "Military group attack workers at dam"
     
     # Predict multiple texts
     uv run scripts/inference_static.py "Text 1" "Text 2" "Text 3"
@@ -23,11 +23,11 @@ Usage:
 
 Example:
     $ uv run scripts/inference_static.py \\
-        "Taliban attack workers at the Kajaki Dam" \\
+        "Military group attack workers at the Kajaki Dam" \\
         "New water treatment plant opens in California"
     
-    Text: Taliban attack workers at the Kajaki Dam
-    Labels: State_conflict, Infrastructure_type, Weapon
+    Text: Military group attacks workers at the Kajaki Dam
+    Labels: Trigger, Casualty, Weapon
     
     Text: New water treatment plant opens in California
     Labels: None (not a water conflict)

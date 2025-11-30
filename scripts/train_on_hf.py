@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # /// script
 # dependencies = [
-#     "water-conflict-classifier>=0.1.17",
+#     "water-conflict-classifier>=0.1.18",
 #     # For development/testing before PyPI publish, use:
 #     # "water-conflict-classifier @ git+https://github.com/yourusername/waterconflict.git#subdirectory=classifier",
 # ]
@@ -396,7 +396,7 @@ def main():
     print("=" * 80)
     
     test_examples = [
-        "Taliban attack workers at the Kajaki Dam in Afghanistan",
+        "Military group attack workers at the Kajaki Dam in Afghanistan",
         "New water treatment plant opens in California",
         "Violent protests erupt over dam construction in Sudan",
         "Scientists discover new water filtration method"

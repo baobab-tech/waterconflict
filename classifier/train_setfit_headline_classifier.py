@@ -160,7 +160,7 @@ print("EXAMPLE PREDICTIONS")
 print("=" * 80)
 
 test_examples = [
-    "Taliban attack workers at the Kajaki Dam in Afghanistan",
+    "Militay group attack workers at the Kajaki Dam in Afghanistan",
     "New water treatment plant opens in California",
     "Violent protests erupt over dam construction in Sudan",
     "Scientists discover new water filtration method"

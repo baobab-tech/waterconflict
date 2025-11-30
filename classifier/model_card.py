@@ -161,7 +161,7 @@ model = SetFitModel.from_pretrained("{model_repo}")
 
 # Predict on headlines
 headlines = [
-    "Taliban attack workers at the Kajaki Dam in Afghanistan",
+    "Military attack workers at the Kajaki Dam in Afghanistan",
     "New water treatment plant opens in California"
 ]
 

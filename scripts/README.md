@@ -373,11 +373,11 @@ Quick inference using the distilled static model.
 **Usage:**
 ```bash
 # Single prediction
-uv run scripts/inference_static.py "Taliban attack workers at dam"
+uv run scripts/inference_static.py "Military group attack workers at dam"
 
 # Multiple predictions
 uv run scripts/inference_static.py \
-  "Taliban attack workers at the Kajaki Dam" \
+  "Military group attacks workers at the Kajaki Dam" \
   "New water treatment plant opens in California"
 
 # Specify model path
@@ -386,8 +386,8 @@ uv run scripts/inference_static.py "Text" --model ./my_static_model
 
 **Example output:**
 ```
-Text: Taliban attack workers at the Kajaki Dam
-Labels: State_conflict, Infrastructure_type, Weapon
+Text: Military group attack workers at the Kajaki Dam
+Labels: Trigger, Casualty, Weapon
 
 Text: New water treatment plant opens in California
 Labels: None (not a water conflict)
@@ -471,7 +471,7 @@ After training, create a fast static version:
 uv run scripts/distill_to_static.py baobabtech/water-conflict-classifier --test
 
 # 2. Test the static model
-uv run scripts/inference_static.py "Taliban attack workers at the Kajaki Dam in Afghanistan"
+uv run scripts/inference_static.py "Military group attack workers at the Kajaki Dam in Afghanistan"
 
 # Or use in Python code:
 python -c "
@@ -484,7 +484,7 @@ with open('./static_model/heads.pkl', 'rb') as f:
     heads = pickle.load(f)
 
 # Predict
-texts = ['Taliban attack workers at the Kajaki Dam in Afghanistan']
+texts = ['Military group attack workers at the Kajaki Dam in Afghanistan']
 emb = embeddings.encode(texts)
 predictions = {label: head.predict(emb) for label, head in heads.items()}
 print(predictions)

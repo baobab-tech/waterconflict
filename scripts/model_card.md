@@ -63,7 +63,7 @@ model = SetFitModel.from_pretrained("baobabtech/water-conflict-classifier")
 
 # Predict on headlines
 headlines = [
-    "Taliban attack workers at the Kajaki Dam in Afghanistan",
+    "Military group attack workers at the Kajaki Dam in Afghanistan",
     "New water treatment plant opens in California"
 ]
 

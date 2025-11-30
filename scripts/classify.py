@@ -19,7 +19,7 @@ LABEL_NAMES = ["Trigger", "Casualty", "Weapon"]
 # ============================================================================
 SAMPLE_HEADLINES = [
     # Water conflict examples (positive cases)
-    "Taliban militants attacked workers at the Kajaki Dam construction site in southern Afghanistan, killing three engineers",
+    "Militay group attacked workers at the Kajaki Dam construction site in southern Afghanistan, killing three engineers",
     "Israeli forces bombed water infrastructure in Gaza, leaving thousands without access to clean drinking water",
     "Armed groups seized control of the Mosul Dam in Iraq during intense fighting between government and insurgent forces",
     "Violent protests erupted in Bolivia over plans to privatize water systems, resulting in multiple casualties",

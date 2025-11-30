@@ -25,7 +25,7 @@ Use the trained model:
 from setfit import SetFitModel
 
 model = SetFitModel.from_pretrained("baobabtech/water-conflict-classifier")
-predictions = model.predict(["Taliban attack workers at dam"])
+predictions = model.predict(["Military group attack workers at dam"])
 # Returns: [[1, 1, 1]]  # [Trigger, Casualty, Weapon]
 ```
 
