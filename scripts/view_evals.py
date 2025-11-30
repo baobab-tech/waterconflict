@@ -60,7 +60,7 @@ def show_all_experiments(df: pd.DataFrame, top_n: int = None):
     
     # Select key columns
     columns = [
-        'version', 'timestamp', 'f1_micro', 'f1_macro', 'accuracy',
+        'version', 'dataset_version', 'timestamp', 'f1_micro', 'f1_macro', 'accuracy',
         'train_size', 'sample_size', 'num_epochs', 'batch_size', 'num_iterations'
     ]
     
@@ -132,7 +132,7 @@ def compare_versions(df: pd.DataFrame, version1: str, version2: str):
             print(f"{metric:<20} {v1:<15.4f} {v2:<15.4f} {diff:<15.4f} {pct_change:<14.2f}% {indicator}")
     
     # Compare configuration
-    config_fields = ['train_size', 'sample_size', 'batch_size', 'num_epochs', 'num_iterations']
+    config_fields = ['dataset_version', 'train_size', 'sample_size', 'batch_size', 'num_epochs', 'num_iterations']
     
     print(f"\n\nConfiguration Comparison:")
     print(f"\n{'Config':<20} {version1:<15} {version2:<15}")

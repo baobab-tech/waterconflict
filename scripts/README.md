@@ -2,7 +2,29 @@
 
 Scripts for data preparation, dataset management, cloud training, and experiment tracking. These scripts use the published [water-conflict-classifier](https://pypi.org/project/water-conflict-classifier/) package.
 
-## Scripts
+## Quick Reference
+
+| Category | Script | Purpose |
+|----------|--------|---------|
+| **🎯 Demo** | `classify.py` | Quick demo of classifier on sample headlines |
+| **📊 Data Prep** | `transform_prep_negatives.py` | Generate ACLED negative examples |
+| | `generate_hard_negatives.py` | Create peaceful water news (hard negatives) |
+| | `upload_datasets.py` | Upload source data to HF Hub |
+| | `prepare_training_dataset.py` | Create training-ready dataset |
+| **🚀 Training** | `train_on_hf.py` | Train on HF Jobs (cloud GPUs) |
+| **⚡ Optimization** | `distill_to_static.py` | Create 50-500x faster static model |
+| | `inference_static.py` | Test the static model |
+| **📈 Analysis** | `view_experiments.py` | Compare training runs locally |
+| | `view_evals.py` | Compare results from HF Hub |
+| | `demo_versioning.py` | Demo versioning system |
+
+**New to this project?** Start with:
+1. `classify.py` - See the classifier in action
+2. **[Typical Workflow](#typical-workflow)** (bottom of this doc) - Step-by-step guide
+
+---
+
+## Script Details
 
 ### `view_experiments.py`
 View and compare model training experiments from local experiment history. All training runs are automatically logged with metrics and configs.
@@ -128,7 +150,7 @@ python generate_hard_negatives.py
 ---
 
 ### `upload_datasets.py`
-Upload training datasets to Hugging Face Hub.
+Upload source datasets to Hugging Face Hub (raw data for reference).
 
 **Usage:**
 ```bash
@@ -140,13 +162,63 @@ python upload_datasets.py
 - Loads `../data/positives.csv`
 - Checks for `../data/negatives_updated.csv` (with hard negatives), falls back to `negatives.csv` if not found
 - Creates/updates HF Hub dataset repository
-- Uploads files to `YOUR_ORG/water-conflict-source-data` (source dataset)
+- Uploads files to `YOUR_ORG/water-conflict-source-data` (source dataset - raw, unprocessed)
 - Shows dataset composition (hard negatives vs ACLED negatives)
 
 **Requirements:**
 - HF authentication: `hf auth login`
 - Config file: Copy `config.sample.py` to `config.py` and set `HF_ORGANIZATION`
 - Training data must be prepared first (run `generate_hard_negatives.py` for best results)
+
+**Note:** This uploads the RAW source data. Run `prepare_training_dataset.py` to create the training-ready dataset.
+
+---
+
+### `prepare_training_dataset.py`
+Prepare and upload training-ready dataset to HuggingFace Hub.
+
+**Usage:**
+```bash
+cd scripts
+python prepare_training_dataset.py
+
+# Custom configuration
+python prepare_training_dataset.py --sample-size 1500 --test-size 0.2
+
+# Use all data (no sampling)
+python prepare_training_dataset.py --no-sampling
+
+# Full control
+python prepare_training_dataset.py \
+  --sample-size 1200 \
+  --test-size 0.15 \
+  --random-state 42
+```
+
+**Arguments:**
+- `--sample-size N`: Number of training samples (default: 1200, optimal for SetFit)
+- `--test-size F`: Test set proportion 0-1 (default: 0.15)
+- `--random-state N`: Random seed for reproducibility (default: 42)
+- `--no-sampling`: Use all data without sampling
+
+**What it does:**
+- Loads raw SOURCE data from HF Hub (`org/water-conflict-source-data`)
+- Preprocesses: converts to multi-label format, balances hard negatives
+- Splits into train/test sets (default: 85/15 split)
+- Samples to optimal size for SetFit (~1200 examples by default)
+- Uploads to `YOUR_ORG/water-conflict-training-data` as training-ready dataset
+
+**Output:** Creates training-ready dataset with:
+- `train.csv` - ready to train (no preprocessing needed)
+- `test.csv` - ready to evaluate
+- README with dataset details and configuration used
+
+**Requirements:**
+- HF authentication: `hf auth login`
+- Source dataset uploaded (see `upload_datasets.py`)
+- Config file with `HF_ORGANIZATION` set
+
+**Why needed:** The training script just loads and trains - all preprocessing happens here, making training simpler and more reproducible.
 
 ---
 
@@ -169,10 +241,8 @@ MODEL_VERSION=v2.0 hf jobs uv run ... scripts/train_on_hf.py
 ```
 
 **What it does:**
-- Downloads source data from HF Hub (`org/water-conflict-source-data`)
-- Applies stratified sampling to ensure balanced label representation
-- **Uploads versioned training dataset** - Uploads sampled data to `org/water-conflict-training-data` with git tag for version (uses HF's built-in versioning like models)
-- Trains SetFit model on GPU infrastructure
+- Loads training-ready data from HF Hub (`org/water-conflict-training-data`)
+- Trains SetFit model on GPU infrastructure (data already preprocessed, balanced, split)
 - Evaluates on held-out test set
 - Pushes trained model to HF Hub with model card
 - Auto-versions and logs experiment to `experiment_history.jsonl`
@@ -182,7 +252,7 @@ MODEL_VERSION=v2.0 hf jobs uv run ... scripts/train_on_hf.py
 **Requirements:**
 - Package published to PyPI (already done: [water-conflict-classifier](https://pypi.org/project/water-conflict-classifier/))
 - HF authentication token (set as `--secrets HF_TOKEN`)
-- Training data uploaded to HF Hub (see `upload_datasets.py`)
+- **Training dataset prepared** (see `prepare_training_dataset.py`)
 - Config file with `HF_ORGANIZATION` set
 
 **Configuration Options:**
@@ -336,19 +406,9 @@ Labels: None (not a water conflict)
 
 ## Typical Workflow
 
-### For Local Training
+Choose your path based on what you want to do:
 
-```bash
-# 1. Generate negative examples
-cd scripts
-python transform_prep_negatives.py
-
-# 2. Train locally
-cd ../classifier
-python train_setfit_headline_classifier.py
-```
-
-### For Cloud Training (HF Jobs)
+### For Cloud Training (HF Jobs) - RECOMMENDED
 
 ```bash
 # 1. Generate base ACLED negatives (if needed)
@@ -364,12 +424,16 @@ cd ..
 cp config.sample.py config.py
 # Edit config.py and set HF_ORGANIZATION
 
-# 4. Upload training data to HF Hub
+# 4. Upload SOURCE data to HF Hub (raw data for reference)
 cd scripts
 python upload_datasets.py
 # This will use negatives_updated.csv automatically
 
-# 5. Run training on HF Jobs
+# 5. Prepare TRAINING dataset (preprocessed, balanced, split, sampled)
+python prepare_training_dataset.py
+# This creates the training-ready dataset with ~1200 samples
+
+# 6. Run training on HF Jobs
 cd ..
 hf jobs uv run \
   --flavor a10g-large \
@@ -378,6 +442,24 @@ hf jobs uv run \
   --env HF_ORGANIZATION=yourorg \
   --namespace yourorg \
   scripts/train_on_hf.py
+```
+
+**Key Point:** Steps 4-5 create two datasets:
+- **SOURCE** (`water-conflict-source-data`): Raw positives + negatives for reference
+- **TRAINING** (`water-conflict-training-data`): Preprocessed, ready-to-train data
+
+The training script (step 6) simply loads the TRAINING dataset and trains - no preprocessing needed.
+
+### For Local Training
+
+```bash
+# 1. Generate negative examples
+cd scripts
+python transform_prep_negatives.py
+
+# 2. Train locally
+cd ../classifier
+python train_setfit_headline_classifier.py
 ```
 
 ### For Static Model Distillation and Usage

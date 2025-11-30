@@ -52,17 +52,19 @@ This is the **source code** for the `water-conflict-classifier` Python package, 
 ```
 classifier/
 ├── __init__.py                         # Package marker
-├── data_prep.py                        # Data loading & preprocessing
+├── data_prep.py                        # Data loading (for training-ready datasets)
 ├── training_logic.py                   # Core training logic
 ├── evaluation.py                       # Model evaluation & metrics
 ├── model_card.py                       # Model card generation
+├── versioning.py                       # Experiment tracking & versioning
+├── evals_upload.py                     # Upload evaluation results to HF
 ├── train_setfit_headline_classifier.py # Local training script
 ├── pyproject.toml                      # Package configuration
 ├── setup.py                            # Build configuration
 └── README.md                           # This file
 ```
 
-**Note:** Scripts that use this package (like cloud training with HF Jobs) are in the `../scripts/` folder.
+**Note:** Scripts that use this package (like cloud training with HF Jobs and dataset preparation) are in the `../scripts/` folder.
 
 ---
 
@@ -106,7 +108,14 @@ Model saved to `./water-conflict-classifier/`
 
 ## Cloud Training
 
-For training on HuggingFace Jobs (managed GPUs), see `../scripts/train_on_hf.py` and the [scripts README](../scripts/README.md).
+For training on HuggingFace Jobs (managed GPUs):
+
+1. **Prepare training dataset**: Use `../scripts/prepare_training_dataset.py` to preprocess, balance, and upload training-ready data to HF Hub
+2. **Train model**: Use `../scripts/train_on_hf.py` to train on HF Jobs infrastructure
+
+The training script loads preprocessed data directly from HF Hub - no data preprocessing happens during training. This separation makes training reproducible and efficient.
+
+See the [scripts README](../scripts/README.md) for complete workflow.
 
 ---
 

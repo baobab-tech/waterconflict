@@ -176,6 +176,8 @@ class ExperimentTracker:
             # Config summary
             config = exp['config']
             print(f"  Config:")
+            if 'dataset_version' in config:
+                print(f"    Dataset version: {config['dataset_version']}")
             if 'train_size' in config:
                 print(f"    Training samples: {config['train_size']}")
             if 'base_model' in config:

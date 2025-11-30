@@ -20,7 +20,7 @@ model = SetFitModel.from_pretrained("baobabtech/water-conflict-classifier")
 
 # Classify headlines
 headlines = [
-    "Taliban attack workers at the Kajaki Dam in Afghanistan",
+    "Military groups attack workers at the Kajaki Dam in Afghanistan",
     "New water treatment plant opens in California"
 ]
 
@@ -40,11 +40,11 @@ waterconflict/
 │   └── See classifier/README.md for package details
 │
 ├── scripts/            # 🛠️ Utility Scripts (uses published package)
-│   ├── classify.py                  (demo: classify sample headlines)
-│   ├── transform_prep_negatives.py  (generate negative examples)
-│   ├── upload_datasets.py           (upload data to HF Hub)
-│   ├── train_on_hf.py               (cloud training with HF Jobs)
-│   ├── view_experiments.py          (compare training runs)
+│   ├── classify.py                   (demo: classify sample headlines)
+│   ├── prepare_training_dataset.py   (prepare & version training data)
+│   ├── train_on_hf.py                (cloud training with HF Jobs)
+│   ├── view_experiments.py           (compare training runs - local)
+│   ├── view_evals.py                 (compare training runs - HF Hub)
 │   └── See scripts/README.md for details
 │
 ├── acled/             # 📊 ACLED Data Analysis Tools
@@ -57,9 +57,9 @@ waterconflict/
 │   ├── hard_negatives.csv    (peaceful water news)
 │   └── ACLED raw data
 │
-├── experiment_history.jsonl  # Auto-generated training history
-├── VERSIONING.md             # Experiment tracking documentation
-└── config.py                 # Project configuration
+├── experiment_history.jsonl  # Training history (dataset→model mapping)
+├── VERSIONING.md             # Dual versioning system docs
+└── config.py                 # HF organization config
 ```
 
 ## Quick Start
@@ -74,20 +74,25 @@ python scripts/classify.py
 
 This uses the published model from HuggingFace Hub and shows inference performance.
 
-### 2. Train Locally
+### 2. Full Training Workflow
 
+**Complete guide:** See [scripts/README.md](scripts/README.md#typical-workflow) for detailed step-by-step workflows.
+
+**Quick overview:**
+1. **Prepare dataset** - Preprocess, balance, sample, and upload (creates version `d1.0`, `d1.1`, etc.)
+2. **Train model** - Cloud (HF Jobs) or local training (creates version `v1.0`, `v1.1`, etc., auto-detects dataset version)
+3. **Track results** - Dual versioning links datasets to models for reproducibility
+4. **Optimize** - Create 50-500x faster static models (optional)
+
+**Step 1: Prepare training dataset**
 ```bash
-cd classifier
-uv pip install -e .
-python train_setfit_headline_classifier.py
+# First time or when data changes (creates d1.0, d1.1, etc.)
+python scripts/prepare_training_dataset.py
 ```
 
-### 3. Train on HF Jobs (Cloud)
-
-The package is published to PyPI: [water-conflict-classifier](https://pypi.org/project/water-conflict-classifier/)
-
+**Step 2: Train model (cloud - recommended):**
 ```bash
-# From repo root
+# Auto-detects latest dataset version, creates model version (v1.0, v1.1, etc.)
 hf jobs uv run \
   --flavor a10g-large \
   --timeout 2h \
@@ -97,25 +102,32 @@ hf jobs uv run \
   scripts/train_on_hf.py
 ```
 
-See `scripts/README.md` for cloud training details and `classifier/README.md` for package documentation.
-
-### 4. Track Experiments & Compare Versions
-
-All training runs are automatically versioned and logged. Each training run creates:
-- **Versioned model** on HF Hub with git tag (e.g., `v0.1.0`)
-- **Versioned training dataset** using HF tags/revisions showing exact sampled data used (`org/water-conflict-training-data` with revision `v0.1.0`)
-- **Evaluation results** in HF evals dataset for comparison
-- **Local experiment log** in `experiment_history.jsonl`
-
+**Or train locally:**
 ```bash
-# View recent experiments
-python scripts/view_experiments.py
-
-# Compare two versions
-python scripts/view_experiments.py --compare v1.0 v1.1
+cd classifier
+uv pip install -e .
+python train_setfit_headline_classifier.py
 ```
 
-See `VERSIONING.md` for full documentation on experiment tracking, version management, and HuggingFace Hub integration.
+### 3. Track & Compare Experiments
+
+**Dual versioning system:**
+- Dataset versions: `d1.0`, `d1.1`, `d2.0` (from `prepare_training_dataset.py`)
+- Model versions: `v1.0`, `v1.1`, `v2.0` (from `train_on_hf.py`)
+- Each model tracks which dataset version it used
+
+```bash
+# View recent experiments (shows dataset→model mapping)
+python scripts/view_experiments.py
+
+# Compare two model versions
+python scripts/view_experiments.py --compare v1.0 v1.1
+
+# View from HF Hub
+python scripts/view_evals.py
+```
+
+See `VERSIONING.md` for full documentation on the dual versioning system.
 
 ## Components
 
@@ -133,15 +145,18 @@ Multi-label SetFit classifier for identifying water-related conflict events in n
 **This folder contains the package source code.** See `classifier/README.md` and `classifier/PUBLISHING.md`.
 
 ### [Scripts](scripts/)
-Utility scripts that use the published package:
-- Demo classifier on sample headlines (`classify.py`)
-- Generate negative examples from ACLED data (`transform_prep_negatives.py`)
-- Generate hard negatives (peaceful water news) to prevent false positives (`generate_hard_negatives.py`)
-- Upload datasets to Hugging Face Hub (`upload_datasets.py`)
-- Train on HF Jobs cloud infrastructure (`train_on_hf.py`)
-- Compare training experiments (`view_experiments.py`)
+**[→ Full Scripts Documentation](scripts/README.md)**
 
-**See:** `scripts/README.md`
+Utility scripts for the complete ML workflow - from data prep to production deployment:
+
+**Getting Started:**
+- 🎯 **Demo** (`classify.py`) - Try the classifier on sample headlines
+- 📊 **Data Prep** (`prepare_training_dataset.py`) - Preprocess, balance, and version datasets
+- 🚀 **Training** (`train_on_hf.py`) - Train on cloud GPUs with HF Jobs
+- 📈 **Analysis** (`view_experiments.py`, `view_evals.py`) - Track and compare experiments
+- ⚡ **Optimization** - Create 50-500x faster static models for production
+
+All scripts use the published [water-conflict-classifier](https://pypi.org/project/water-conflict-classifier/) package. See [scripts/README.md](scripts/README.md) for detailed usage and workflows.
 
 ### [ACLED Analysis](acled/)
 Tools for analyzing Armed Conflict Location & Event Data (ACLED) to understand conflict patterns and generate training data.

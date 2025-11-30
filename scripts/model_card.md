@@ -1,102 +1,4 @@
-"""
-Model card generation for water conflict classifier.
-
-Creates comprehensive model cards with training details and evaluation metrics.
-"""
-
-import requests
-from typing import Optional
-
-
-def get_base_model_info(model_id: str) -> dict:
-    """
-    Fetch base model information from HuggingFace API.
-    
-    Args:
-        model_id: HuggingFace model ID (e.g. 'sentence-transformers/all-mpnet-base-v2')
-        
-    Returns:
-        Dictionary with 'params' (int) and 'size_mb' (int) keys
-    """
-    try:
-        url = f"https://huggingface.co/api/models/{model_id}/revision/main"
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-        
-        # Extract parameter count from safetensors info
-        total_params = 0
-        if 'safetensors' in data and 'parameters' in data['safetensors']:
-            total_params = data['safetensors'].get('total', 0)
-        
-        # Format parameter count (e.g., 109486978 -> "109M")
-        params_formatted = f"{total_params / 1_000_000:.0f}M" if total_params > 0 else "33M"
-        
-        # Estimate size in MB (rough estimate: 4 bytes per param for float32)
-        size_mb = int(total_params * 4 / 1_000_000) if total_params > 0 else 130
-        
-        return {
-            'params': params_formatted,
-            'params_raw': total_params,
-            'size_mb': size_mb
-        }
-    except Exception as e:
-        print(f"Warning: Could not fetch model info from HF API: {e}")
-        # Fallback to defaults
-        return {
-            'params': '33M',
-            'params_raw': 33_000_000,
-            'size_mb': 130
-        }
-
-
-def generate_model_card(model_repo: str,
-                       base_model: str,
-                       label_names: list[str],
-                       eval_results: dict,
-                       train_size: int,
-                       test_size: int,
-                       batch_size: int,
-                       num_epochs: int,
-                       num_iterations: int = 20,
-                       sampling_strategy: str = "undersampling",
-                       evals_repo: Optional[str] = None,
-                       training_dataset_repo: Optional[str] = None,
-                       dataset_version: Optional[str] = None) -> str:
-    """
-    Generate comprehensive model card with evaluation results.
-    
-    Args:
-        model_repo: HF model repository ID
-        base_model: Base model used for training
-        label_names: List of label names
-        eval_results: Dictionary from evaluate_model()
-        train_size: Number of training examples
-        test_size: Number of test examples
-        batch_size: Training batch size
-        num_epochs: Number of training epochs
-        num_iterations: Number of contrastive pair iterations
-        sampling_strategy: Training sampling strategy
-        evals_repo: Optional HF evals dataset repo ID for experiment tracking
-        training_dataset_repo: Optional HF dataset repo ID for versioned training data
-        dataset_version: Optional dataset version (e.g., "d1.0")
-        
-    Returns:
-        Model card markdown string
-    """
-    overall = eval_results['overall']
-    per_label = eval_results['per_label']
-    
-    # Fetch base model info from HF API
-    model_info = get_base_model_info(base_model)
-    
-    # Calculate test split percentage
-    test_split = test_size / (train_size + test_size)
-    
-    # Training info
-    training_info = f"{train_size} examples"
-    
-    model_card = f"""---
+---
 license: cc-by-nc-4.0
 library_name: setfit
 tags:
@@ -140,13 +42,13 @@ These categories align with the Pacific Institute's Water Conflict Chronology fr
 
 ## 🏗️ Model Details
 
-- **Base Model**: [{base_model}](https://huggingface.co/{base_model})
+- **Base Model**: [BAAI/bge-small-en-v1.5](https://huggingface.co/BAAI/bge-small-en-v1.5)
 - **Architecture**: SetFit with One-vs-Rest multi-label strategy
 - **Training Approach**: Few-shot learning optimized (SetFit reaches peak performance with small samples)
-- **Training samples**: {training_info}
-- **Test samples**: {test_size} (held-out, never seen during training)
+- **Training samples**: 1200 (sampled from 2937 total training pool)
+- **Test samples**: 519 (held-out, never seen during training)
 - **Training time**: ~2-5 minutes on A10G GPU
-- **Model size**: {model_info['params']} Parameters, ~{model_info['size_mb']}MB
+- **Model size**: 33M Parameters, ~133MB
 - **Inference speed**: ~5-10ms per headline on CPU
 
 ## 💻 Usage
@@ -157,7 +59,7 @@ These categories align with the Pacific Institute's Water Conflict Chronology fr
 from setfit import SetFitModel
 
 # Load the trained model from HF Hub
-model = SetFitModel.from_pretrained("{model_repo}")
+model = SetFitModel.from_pretrained("baobabtech/water-conflict-classifier")
 
 # Predict on headlines
 headlines = [
@@ -180,8 +82,8 @@ label_names = ['Trigger', 'Casualty', 'Weapon']
 
 for headline, pred in zip(headlines, predictions):
     labels = [label_names[i] for i, val in enumerate(pred) if val == 1]
-    print(f"Headline: {{headline}}")
-    print(f"Labels: {{', '.join(labels) if labels else 'None'}}")
+    print(f"Headline: {headline}")
+    print(f"Labels: {', '.join(labels) if labels else 'None'}")
     print()
 ```
 
@@ -212,64 +114,50 @@ df['weapon'] = [p[2] for p in predictions]
 
 ## 📈 Evaluation Results
 
-Evaluated on a held-out test set of {test_size} samples ({test_split*100:.0f}% of total data, stratified by label combinations).
+Evaluated on a held-out test set of 519 samples (15% of total data, stratified by label combinations).
 
 ### Overall Performance
 
 | Metric | Score |
 |--------|-------|
-| Exact Match Accuracy | {overall['accuracy']:.4f} |
-| Hamming Loss | {overall['hamming_loss']:.4f} |
-| F1 (micro) | {overall['f1_micro']:.4f} |
-| F1 (macro) | {overall['f1_macro']:.4f} |
-| F1 (samples) | {overall['f1_samples']:.4f} |
+| Exact Match Accuracy | 0.8516 |
+| Hamming Loss | 0.0681 |
+| F1 (micro) | 0.8840 |
+| F1 (macro) | 0.8143 |
+| F1 (samples) | 0.7158 |
 
 ### Per-Label Performance
 
 | Label | Precision | Recall | F1 | Support |
 |-------|-----------|--------|-----|---------|
-"""
-    
-    for label_name in label_names:
-        metrics = per_label[label_name]
-        model_card += f"| {label_name} | {metrics['precision']:.4f} | {metrics['recall']:.4f} | {metrics['f1']:.4f} | {metrics['support']} |\n"
-    
-    model_card += f"""
+| Trigger | 0.9143 | 0.9249 | 0.9195 | 173 |
+| Casualty | 0.9034 | 0.9227 | 0.9130 | 233 |
+| Weapon | 0.6744 | 0.5577 | 0.6105 | 52 |
+
 ### Training Details
 
-- **Training samples**: {train_size} examples
-- **Test samples**: {test_size} examples (held-out before sampling)
-- **Base model**: {base_model} ({model_info['params']} params)
-- **Batch size**: {batch_size}
-- **Epochs**: {num_epochs}
-- **Iterations**: {num_iterations} (contrastive pair generation)
-- **Sampling strategy**: {sampling_strategy} (balances positive/negative pairs)
-"""
-    
-    # Add training dataset link if provided
-    if training_dataset_repo:
-        dataset_version_str = f" (version: {dataset_version})" if dataset_version else ""
-        model_card += f"""- **Training Dataset**: [{training_dataset_repo}](https://huggingface.co/datasets/{training_dataset_repo}){dataset_version_str}
+- **Training samples**: 1200 examples
+- **Test samples**: 519 examples (held-out before sampling)
+- **Base model**: BAAI/bge-small-en-v1.5 (33M params)
+- **Batch size**: 64
+- **Epochs**: 1
+- **Iterations**: 20 (contrastive pair generation)
+- **Sampling strategy**: undersampling (balances positive/negative pairs)
+- **Training Dataset**: [baobabtech/water-conflict-training-data](https://huggingface.co/datasets/baobabtech/water-conflict-training-data) - Exact sampled data used for this model version
 
-"""
-    
-    # Add experiment tracking section if evals repo is provided
-    if evals_repo:
-        model_card += f"""
+
 ### 📈 Experiment Tracking
 
 All training runs are automatically tracked in a public dataset for experiment comparison:
 
-- **Evals Dataset**: [{evals_repo}](https://huggingface.co/datasets/{evals_repo})
+- **Evals Dataset**: [baobabtech/water-conflict-classifier-evals](https://huggingface.co/datasets/baobabtech/water-conflict-classifier-evals)
 - **Tracked Metrics**: F1 scores, accuracy, per-label performance, and all hyperparameters
 - **Compare Experiments**: View how different configurations (sample size, epochs, batch size) affect performance
 - **Reproducibility**: Full training configs logged for each version
 
 You can explore past experiments and compare model performance across versions using the evals dataset.
 
-"""
-    
-    model_card += """
+
 ## 📊 Data Sources
 
 ### Positive Examples (Water Conflict Headlines)
@@ -360,7 +248,7 @@ If you use this model in your work, please cite:
   title={{Water Conflict Multi-Label Classifier}},
   author={{Independent Experimental Research Drawing on Pacific Institute Water Conflict Chronology}},
   year={{2025}},
-  howpublished={{\\url{{https://huggingface.co/{model_repo}}}}},
+  howpublished={{\url{{https://huggingface.co/{model_repo}}}}},
   note={{Training data from Pacific Institute Water Conflict Chronology and ACLED}}
 }}
 ```
@@ -377,8 +265,3 @@ Please also cite the Pacific Institute's Water Conflict Chronology:
   note={{Accessed: [access date]}}
 }}
 ```
-
-"""
-    
-    return model_card
-
