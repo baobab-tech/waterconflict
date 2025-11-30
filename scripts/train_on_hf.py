@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # /// script
 # dependencies = [
-#     "water-conflict-classifier>=0.1.18",
+#     "water-conflict-classifier>=0.1.19",
 #     # For development/testing before PyPI publish, use:
 #     # "water-conflict-classifier @ git+https://github.com/yourusername/waterconflict.git#subdirectory=classifier",
 # ]
@@ -343,17 +343,27 @@ def main():
         
         # Log experiment to local history
         tracker = ExperimentTracker(EXPERIMENT_HISTORY_FILE)
+        
+        # Calculate fields from loaded data
+        train_size = len(train_data)
+        test_size = len(test_data)
+        full_train_size = train_size + test_size
+        test_split = test_size / full_train_size if full_train_size > 0 else None
+        
         experiment = tracker.log_experiment(
             version=version,
             config={
                 "base_model": BASE_MODEL,
-                "train_size": len(train_data),
-                "test_size": len(test_data),
+                "train_size": train_size,
+                "test_size": test_size,
+                "full_train_size": full_train_size,
                 "batch_size": BATCH_SIZE,
                 "num_epochs": NUM_EPOCHS,
-                "num_iterations": NUM_ITERATIONS,
+                "sample_size": train_size,
                 "sampling_strategy": "undersampling",
-                "dataset_version": dataset_version,  # Track which dataset version was used
+                "test_split": test_split,
+                "num_iterations": NUM_ITERATIONS,
+                "dataset_version": dataset_version,
             },
             metrics=eval_results,
             metadata={

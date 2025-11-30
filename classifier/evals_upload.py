@@ -42,7 +42,11 @@ def upload_eval_results(
             - overall: dict with f1_micro, f1_macro, accuracy, etc.
             - per_label: dict with per-label precision, recall, f1
             - y_true, y_pred: numpy arrays (will be ignored)
-        metadata: Optional additional metadata (model_repo, dataset_repo, etc.)
+        metadata: Optional additional metadata dict with keys:
+            - model_repo: Model repository ID
+            - dataset_repo: Training dataset repository ID
+            - dataset_version: Dataset version used (e.g., d1.0, d1.1)
+            - notes: Optional notes
         token: Optional HF token (uses default if not provided)
         
     Returns:
@@ -121,6 +125,7 @@ def upload_eval_results(
         if metadata:
             row_data["model_repo"] = metadata.get("model_repo")
             row_data["dataset_repo"] = metadata.get("dataset_repo")
+            row_data["dataset_version"] = metadata.get("dataset_version")
             row_data["notes"] = metadata.get("notes", "")
         
         # Create new dataframe
@@ -234,6 +239,7 @@ For each label (trigger, casualty, weapon):
 #### Metadata
 - `model_repo`: HF model repository
 - `dataset_repo`: HF training data repository
+- `dataset_version`: Training dataset version (e.g., d1.0, d1.1)
 - `notes`: Optional notes about the training run
 
 ## Usage
