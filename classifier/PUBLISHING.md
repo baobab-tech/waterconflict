@@ -36,7 +36,7 @@ waterconflict/                    # Mono repo root
 
 ## Building with UV
 
-```bash
+```shell
 cd classifier
 
 # Build the package (creates dist/ folder)
@@ -52,7 +52,7 @@ uv build
 ### First Time Setup
 
 1. Install twine:
-   ```bash
+   ```shell
    pip install twine
    ```
 
@@ -80,7 +80,7 @@ uv build
 
 ### Publish to Test PyPI (Recommended First)
 
-```bash
+```shell
 cd classifier
 
 # Build first
@@ -95,7 +95,7 @@ pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://
 
 ### Publish to Production PyPI
 
-```bash
+```shell
 cd classifier
 
 # Make sure you've tested on test PyPI first!
@@ -112,7 +112,7 @@ twine upload dist/*
 
 ## Complete Workflow
 
-```bash
+```shell
 # 1. Navigate to package
 cd classifier
 
@@ -154,7 +154,7 @@ hf jobs uv run \
 If you don't want to publish to PyPI, you can use a Git URL in your UV dependencies:
 
 1. **Push to GitHub:**
-   ```bash
+   ```shell
    git add .
    git commit -m "Add classifier package"
    git push
@@ -170,7 +170,7 @@ If you don't want to publish to PyPI, you can use a Git URL in your UV dependenc
    ```
 
 3. **Works immediately with HF Jobs:**
-   ```bash
+   ```shell
    hf jobs uv run \
      --flavor a10g-large \
      --secrets HF_TOKEN \
@@ -197,7 +197,7 @@ If you have an old `/water_conflict_classifier/` folder (duplicate), you can del
 ### "Module not found" errors
 
 Make sure you're running from the right directory:
-```bash
+```shell
 cd classifier  # Must be in package root
 uv pip install -e .
 python train_setfit_headline_classifier.py
@@ -208,7 +208,7 @@ python train_setfit_headline_classifier.py
 If you get 403 errors, make sure your `~/.pypirc` is configured correctly with the API tokens.
 
 You can also pass credentials directly:
-```bash
+```shell
 twine upload --repository testpypi dist/* --username __token__ --password pypi-your-token-here
 ```
 

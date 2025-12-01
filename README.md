@@ -8,7 +8,7 @@ Experimental research tools to potentially support the [Pacific Institute's Wate
 
 Install setfit and use the trained classifier:
 
-```bash
+```shell
 pip install setfit
 ```
 
@@ -68,7 +68,7 @@ waterconflict/
 
 Run the demo script to classify 20 sample headlines with timing metrics:
 
-```bash
+```shell
 python scripts/classify.py
 ```
 
@@ -85,13 +85,13 @@ This uses the published model from HuggingFace Hub and shows inference performan
 4. **Optimize** - Create 50-500x faster static models (optional)
 
 **Step 1: Prepare training dataset**
-```bash
+```shell
 # First time or when data changes (creates d1.0, d1.1, etc.)
 python scripts/prepare_training_dataset.py
 ```
 
 **Step 2: Train model (cloud - recommended):**
-```bash
+```shell
 # Auto-detects latest dataset version, creates model version (v1.0, v1.1, etc.)
 hf jobs uv run \
   --flavor a10g-large \
@@ -103,7 +103,7 @@ hf jobs uv run \
 ```
 
 **Or train locally:**
-```bash
+```shell
 cd classifier
 uv pip install -e .
 python train_setfit_headline_classifier.py
@@ -116,7 +116,7 @@ python train_setfit_headline_classifier.py
 - Model versions: `v1.0`, `v1.1`, `v2.0` (from `train_on_hf.py`)
 - Each model tracks which dataset version it used
 
-```bash
+```shell
 # View recent experiments (shows dataset→model mapping)
 python scripts/view_experiments.py
 

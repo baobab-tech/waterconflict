@@ -15,7 +15,7 @@ SetFit-based multi-label text classifier for identifying water-related conflict 
 
 Install from PyPI:
 
-```bash
+```shell
 pip install water-conflict-classifier
 ```
 
@@ -77,7 +77,7 @@ Train on your own hardware with local data files.
 
 1. **Install the package in development mode:**
 
-```bash
+```shell
 uv pip install -e .
 # or with regular pip:
 pip install -e .
@@ -92,14 +92,14 @@ Training data should be in `../data/`:
 - `../data/negatives.csv` - Non-water conflict headlines
 
 Generate negatives from ACLED (if needed):
-```bash
+```shell
 cd ../scripts
 python transform_prep_negatives.py
 ```
 
 3. **Train:**
 
-```bash
+```shell
 python train_setfit_headline_classifier.py
 ```
 

@@ -31,7 +31,7 @@ Scripts for data preparation, dataset management, cloud training, and experiment
 View and compare model training experiments from local experiment history. All training runs are automatically logged with metrics and configs.
 
 **Usage:**
-```bash
+```shell
 # View recent experiments
 python scripts/view_experiments.py
 
@@ -59,7 +59,7 @@ python scripts/view_experiments.py --compare v1.0 v1.2 --metric accuracy
 View and compare evaluation results from HuggingFace evals dataset. Training runs automatically upload results to HF for easy comparison across experiments.
 
 **Usage:**
-```bash
+```shell
 # View all experiments sorted by F1 score
 python scripts/view_evals.py
 
@@ -94,7 +94,7 @@ python scripts/view_evals.py --labels --top 5
 Create sample experiments to demonstrate the versioning system.
 
 **Usage:**
-```bash
+```shell
 python scripts/demo_versioning.py
 ```
 
@@ -106,7 +106,7 @@ Creates demo data in `demo_experiment_history.jsonl` to explore the versioning f
 Generate negative examples (non-water conflict headlines) from ACLED data.
 
 **Usage:**
-```bash
+```shell
 cd scripts
 python transform_prep_negatives.py
 ```
@@ -129,7 +129,7 @@ python transform_prep_negatives.py
 Generate "hard negatives" - peaceful water-related news to prevent false positives.
 
 **Usage:**
-```bash
+```shell
 cd scripts
 python generate_hard_negatives.py
 ```
@@ -154,7 +154,7 @@ python generate_hard_negatives.py
 Upload source datasets to Hugging Face Hub (raw data for reference).
 
 **Usage:**
-```bash
+```shell
 cd scripts
 python upload_datasets.py
 ```
@@ -179,7 +179,7 @@ python upload_datasets.py
 Prepare and upload training-ready dataset to HuggingFace Hub.
 
 **Usage:**
-```bash
+```shell
 cd scripts
 python prepare_training_dataset.py
 
@@ -227,7 +227,7 @@ python prepare_training_dataset.py \
 Train the water conflict classifier on HuggingFace Jobs (managed GPUs).
 
 **Usage:**
-```bash
+```shell
 # From repo root
 hf jobs uv run \
   --flavor a10g-large \
@@ -266,7 +266,7 @@ MODEL_VERSION=v2.0 hf jobs uv run ... scripts/train_on_hf.py
 **Expected Runtime:** ~2-5 minutes on A10G GPU
 
 **Monitoring:**
-```bash
+```shell
 # List jobs
 hf jobs ps -a --namespace yourorg
 
@@ -278,7 +278,7 @@ hf jobs cancel <job_id> --namespace yourorg
 ```
 
 **Local Testing:**
-```bash
+```shell
 # Test locally before submitting to HF Jobs
 uv run scripts/train_on_hf.py
 ```
@@ -291,7 +291,7 @@ Note: Still requires dataset on HF Hub and proper authentication.
 Train with Optuna hyperparameter search to find optimal settings automatically.
 
 **Usage:**
-```bash
+```shell
 # Default: 50 trials, search on 200 samples, train final on full data
 hf jobs uv run \
   --flavor a10g-large \
@@ -326,7 +326,7 @@ hf jobs uv run ... --env SEARCH_MODELS=true --env N_TRIALS=100 scripts/train_on_
 Create a static (non-neural) version of your trained model for **50-500x faster inference** with no GPU.
 
 **Usage:**
-```bash
+```shell
 # Distill from HuggingFace Hub
 uv run scripts/distill_to_static.py baobabtech/water-conflict-classifier
 
@@ -407,7 +407,7 @@ static_model/
 Quick inference using the distilled static model.
 
 **Usage:**
-```bash
+```shell
 # Single prediction
 uv run scripts/inference_static.py "Military group attack workers at dam"
 
@@ -446,7 +446,7 @@ Choose your path based on what you want to do:
 
 ### For Cloud Training (HF Jobs) - RECOMMENDED
 
-```bash
+```shell
 # 1. Generate base ACLED negatives (if needed)
 cd scripts
 python transform_prep_negatives.py
@@ -488,7 +488,7 @@ The training script (step 6) simply loads the TRAINING dataset and trains - no p
 
 ### For Local Training
 
-```bash
+```shell
 # 1. Generate negative examples
 cd scripts
 python transform_prep_negatives.py
@@ -502,7 +502,7 @@ python train_setfit_headline_classifier.py
 
 After training, create a fast static version:
 
-```bash
+```shell
 # 1. Distill trained model to static embeddings
 uv run scripts/distill_to_static.py baobabtech/water-conflict-classifier --test
 
