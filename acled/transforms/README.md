@@ -58,7 +58,7 @@ Analyzes tags and temporal patterns.
 
 Run individual scripts:
 
-```shell
+```bash
 # Analyze enum values
 python3 transforms/analyze_enums.py
 
@@ -74,7 +74,7 @@ python3 transforms/analyze_tags.py
 
 Or run all at once:
 
-```shell
+```bash
 cd transforms
 for script in analyze_*.py; do
     echo "Running $script..."

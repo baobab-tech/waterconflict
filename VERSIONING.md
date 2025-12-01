@@ -24,7 +24,7 @@ This allows independent tracking (e.g., model `v2.3` trained on dataset `d1.5`).
 
 ### 1. Prepare Training Dataset (with versioning)
 
-```shell
+```bash
 # First time - creates d1.0
 python scripts/prepare_training_dataset.py
 
@@ -37,7 +37,7 @@ python scripts/prepare_training_dataset.py --major
 
 ### 2. Train Model (auto-detects dataset version)
 
-```shell
+```bash
 # Trains model, auto-detects dataset version (d1.0, d1.1, etc.)
 uv run scripts/train_on_hf.py
 
@@ -47,7 +47,7 @@ uv run scripts/train_on_hf.py
 
 ### 3. View Experiment History
 
-```shell
+```bash
 # View recent experiments (shows dataset version used)
 python scripts/view_experiments.py
 
@@ -79,13 +79,13 @@ v1.2 - 2024-11-26T14:30:45
 ## Why Separate Dataset & Model Versions?
 
 **Compare fairly**: Compare models trained on same dataset
-```shell
+```bash
 v1.0 on d1.0: F1=0.85
 v1.1 on d1.0: F1=0.87  ← Better hyperparameters
 ```
 
 **Track data impact**: See how data changes affect performance
-```shell
+```bash
 v2.0 on d1.0: F1=0.87
 v2.1 on d2.0: F1=0.90  ← Better data quality
 ```
@@ -125,7 +125,7 @@ dataset = load_dataset("org/water-conflict-training-data", revision="d1.0")
 
 ## Manual Version Control
 
-```shell
+```bash
 # Dataset version
 python scripts/prepare_training_dataset.py --version d2.0
 python scripts/prepare_training_dataset.py --major  # d1.5 → d2.0
@@ -163,7 +163,7 @@ Logged to `experiment_history.jsonl`:
 ## Viewing & Comparing
 
 ### Local History
-```shell
+```bash
 # View recent experiments with dataset versions
 python scripts/view_experiments.py
 
@@ -172,7 +172,7 @@ python scripts/view_experiments.py --compare v1.0 v1.2
 ```
 
 ### HF Hub Evals
-```shell
+```bash
 # View all experiments from HF Hub
 python scripts/view_evals.py
 
@@ -203,7 +203,7 @@ Both tools now show which dataset version (`d1.0`, `d1.1`, etc.) was used for ea
 
 ## Example Workflow
 
-```shell
+```bash
 # 1. Prepare dataset (creates d1.0)
 python scripts/prepare_training_dataset.py
 
