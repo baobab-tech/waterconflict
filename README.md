@@ -1,10 +1,121 @@
-# Water Conflict Research
+# Water Conflict Classification
 
 Experimental research tools to potentially support the [Pacific Institute's Water Conflict Chronology](https://www.worldwater.org/water-conflict/) project.
 
+> **tl;dr** This tiny model (33m params) classifies events (headlines/descriptions) into water-related conflict events using 3 labels.
+
+
 **Published Package:** [water-conflict-classifier on PyPI](https://pypi.org/project/water-conflict-classifier/)
 
-## Usage
+## 📈 Performance Notes
+
+The current version v2.5 of the model (as of Dec 1st, 2025) still only achieves the following performance scores at 82% accuracy:
+
+| Overall Metric              | Value  |
+|-----------------------------|--------|
+| Accuracy (exact match)      | 0.8189 |
+| Hamming Loss                | 0.0816 |
+| F1 (micro)                  | 0.8656 |
+| F1 (macro)                  | 0.8106 |
+| F1 (samples)                | 0.7075 |
+
+| Label    | Precision | Recall | F1     | Support |
+|----------|-----------|--------|--------|---------|
+| Trigger  | 0.8953    | 0.8851 | 0.8902 | 174     |
+| Casualty | 0.8889    | 0.9270 | 0.9076 | 233     |
+| Weapon   | 0.5493    | 0.7500 | 0.6341 | 52      |
+
+```
+
+```
+
+## 🚀 Quick Start
+
+Try the Classifier (Demo)
+
+Run the demo script to classify 20 sample headlines with timing metrics:
+
+```bash
+python scripts/classify.py
+```
+
+This uses the published model from HuggingFace Hub and shows inference performance, e.g.,
+
+> You will notice the model shows 3 clear false positives (items 11, 16, 19) where peaceful water developments were misclassified as conflicts. The 0.82 accuracy likely reflects similar edge-case errors.
+
+
+```
+================================================================================
+Water Conflict Classifier - Sample Classification Demo
+================================================================================
+Model: baobabtech/water-conflict-classifier
+Headlines to classify: 20
+================================================================================
+
+[1/3] Loading model from Hugging Face Hub...
+  ✓ Model loaded in 2.41s
+
+[2/3] Running inference...
+  ✓ Classified 20 headlines in 0.213s
+  ✓ Average time per headline: 10.6ms
+
+[3/3] Results:
+================================================================================
+ 1. 🔴 Militay group attacked workers at the Kajaki Dam construction site in southern Afghanistan, killing three engineers
+    → Labels: Casualty
+
+ 2. 🔴 Israeli forces bombed water infrastructure in Gaza, leaving thousands without access to clean drinking water
+    → Labels: Casualty
+
+ 3. 🔴 Armed groups seized control of the Mosul Dam in Iraq during intense fighting between government and insurgent forces
+    → Labels: Casualty, Weapon
+
+(...)
+
+11. 🔴 New desalination plant opens in California to address drought conditions with innovative technology
+    → Labels: Weapon
+
+12. 🟢 Scientists discover breakthrough water filtration method using graphene-based materials for purification
+    → Labels: ❌ No conflict
+
+13. 🟢 City council approves budget for upgrading municipal water treatment systems to meet new standards
+    → Labels: ❌ No conflict
+
+(...)
+
+16. 🔴 Tech startup develops smart irrigation system that reduces agricultural water consumption by forty percent
+    → Labels: Weapon
+
+(...)
+
+19. 🔴 Community celebrates completion of new well providing clean water access to rural village in Kenya
+    → Labels: Trigger
+
+20. 🟢 Weather forecasts predict heavy monsoon rains and potential flooding in South Asian coastal regions
+    → Labels: ❌ No conflict
+
+================================================================================
+SUMMARY
+================================================================================
+Total headlines classified: 20
+Water conflict detected: 13 (65.0%)
+No conflict detected: 7 (35.0%)
+
+Performance:
+  - Model load time: 14.51s
+  - Total inference time: 0.332s
+  - Average per headline: 16.6ms
+  - Throughput: 60.2 headlines/second
+================================================================================
+
+Label Distribution in Detected Conflicts:
+  - Trigger: 4 occurrences
+  - Casualty: 6 occurrences
+  - Weapon: 5 occurrences
+================================================================================
+```
+
+## 👩🏽‍💻 Usage
 
 Install setfit and use the trained classifier:
 
@@ -26,9 +137,11 @@ headlines = [
 
 predictions = model.predict(headlines)
 # Returns: [[1, 1, 1], [0, 0, 0]]  # [Trigger, Casualty, Weapon]
+
+
 ```
 
-## Project Structure
+## 🗂️ Project Structure
 
 This is a **mono repo** containing multiple tools for water conflict research:
 
@@ -62,19 +175,8 @@ waterconflict/
 └── config.py                 # HF organization config
 ```
 
-## Quick Start
 
-### 1. Try the Classifier (Demo)
-
-Run the demo script to classify 20 sample headlines with timing metrics:
-
-```bash
-python scripts/classify.py
-```
-
-This uses the published model from HuggingFace Hub and shows inference performance.
-
-### 2. Full Training Workflow
+### 🏋🏽‍♀️ Full Training Workflow
 
 **Complete guide:** See [scripts/README.md](scripts/README.md#typical-workflow) for detailed step-by-step workflows.
 
@@ -109,7 +211,7 @@ uv pip install -e .
 python train_setfit_headline_classifier.py
 ```
 
-### 3. Track & Compare Experiments
+### 🧪 Track & Compare Experiments
 
 **Dual versioning system:**
 - Dataset versions: `d1.0`, `d1.1`, `d2.0` (from `prepare_training_dataset.py`)
@@ -129,7 +231,7 @@ python scripts/view_evals.py
 
 See `VERSIONING.md` for full documentation on the dual versioning system.
 
-## Components
+## 🧱 Components
 
 ### [Classifier Package](classifier/)
 Multi-label SetFit classifier for identifying water-related conflict events in news headlines. Classifies into three categories: Trigger, Casualty, Weapon.
@@ -161,7 +263,7 @@ All scripts use the published [water-conflict-classifier](https://pypi.org/proje
 ### [ACLED Analysis](acled/)
 Tools for analyzing Armed Conflict Location & Event Data (ACLED) to understand conflict patterns and generate training data.
 
-## Data Sources
+## 📚 Data Sources
 
 **Positive Examples:** Pacific Institute Water Conflict Chronology  
 https://www.worldwater.org/water-conflict/
@@ -177,9 +279,9 @@ Copyright © 2025 Baobab Tech
 
 Licensed under [Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)](http://creativecommons.org/licenses/by-nc/4.0/).
 
-**Non-commercial use only.** For commercial licensing inquiries, contact Baobab Tech.
+**Non-commercial use only.** 
 
-## Frugal AI Philosophy
+## 🌱 Frugal AI Philosophy
 
 This project demonstrates intentional "frugal AI" - using small, efficient models (e.g., ~33M parameters) fine-tuned on limited data (~600 examples) instead of defaulting to massive LLMs (100B+ parameters) for simple classification tasks.
 

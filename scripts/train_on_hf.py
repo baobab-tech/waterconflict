@@ -116,9 +116,10 @@ EVALS_REPO = f"{HF_ORGANIZATION}/{EVALS_REPO_NAME}"
 
 # Training configuration
 BASE_MODEL = "BAAI/bge-small-en-v1.5" # "sentence-transformers/all-MiniLM-L6-v2" #
-BATCH_SIZE = 32  # Smaller batches work better for ~1200 samples
-NUM_EPOCHS = 4   # SetFit best practice: 3-5 epochs for embedding fine-tuning
+BATCH_SIZE = 16  # Smaller batches work better for ~1200 samples
+NUM_EPOCHS = 3   # SetFit best practice: 3-5 epochs for embedding fine-tuning
 NUM_ITERATIONS = 20
+SAMPLING_STRATEGY = "undersampling" # "oversampling" or "undersampling"
 
 # Versioning configuration
 VERSION = os.environ.get("MODEL_VERSION")  # Optional: set explicit version (e.g., "v1.5")
@@ -279,7 +280,7 @@ def main():
         batch_size=BATCH_SIZE,
         num_epochs=NUM_EPOCHS,
         num_iterations=NUM_ITERATIONS,
-        sampling_strategy="oversampling",  # Better for minority class (Weapon)
+        sampling_strategy=SAMPLING_STRATEGY, # "oversampling" or "undersampling"
         model_card_data=model_card_data
     )
     
@@ -308,7 +309,7 @@ def main():
         batch_size=BATCH_SIZE,
         num_epochs=NUM_EPOCHS,
         num_iterations=NUM_ITERATIONS,
-        sampling_strategy="oversampling",  # Better for minority class (Weapon)
+        sampling_strategy=SAMPLING_STRATEGY, # "oversampling" or "undersampling"
         evals_repo=EVALS_REPO,
         training_dataset_repo=TRAINING_DATASET_REPO,
         dataset_version=dataset_version
@@ -360,9 +361,8 @@ def main():
                 "batch_size": BATCH_SIZE,
                 "num_epochs": NUM_EPOCHS,
                 "sample_size": train_size,
-                "sampling_strategy": "oversampling",
+                "sampling_strategy": SAMPLING_STRATEGY, # "oversampling" or "undersampling"
                 "test_split": test_split,
-                "num_iterations": NUM_ITERATIONS,
                 "dataset_version": dataset_version,
                 "training_type": "standard",
             },
