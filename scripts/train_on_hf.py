@@ -116,8 +116,8 @@ EVALS_REPO = f"{HF_ORGANIZATION}/{EVALS_REPO_NAME}"
 
 # Training configuration
 BASE_MODEL = "BAAI/bge-small-en-v1.5" # "sentence-transformers/all-MiniLM-L6-v2" #
-BATCH_SIZE = 16  # Smaller batches work better for ~1200 samples
-NUM_EPOCHS = 3   # SetFit best practice: 3-5 epochs for embedding fine-tuning
+BATCH_SIZE = 64 
+NUM_EPOCHS = 1   # SetFit best practice: 3-5 epochs for embedding fine-tuning
 NUM_ITERATIONS = 20
 SAMPLING_STRATEGY = "undersampling" # "oversampling" or "undersampling"
 
@@ -362,6 +362,7 @@ def main():
                 "num_epochs": NUM_EPOCHS,
                 "sample_size": train_size,
                 "sampling_strategy": SAMPLING_STRATEGY, # "oversampling" or "undersampling"
+                "num_iterations": NUM_ITERATIONS,
                 "test_split": test_split,
                 "dataset_version": dataset_version,
                 "training_type": "standard",
