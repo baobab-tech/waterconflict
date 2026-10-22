@@ -12,7 +12,7 @@
 A substantial portion of the core technical work is already built and publicly available, which de-risks the project and accelerates delivery:
 
 - **A trained, published classification model** that sorts events into the three WCC categories — Trigger, Casualty, and Weapon — at ~82% accuracy. It is lightweight and fast enough to screen large volumes of text cheaply.
-- **Curated, versioned training datasets** drawn from WCC historical records and ACLED conflict data, plus synthetic "hard negatives" (peaceful water news) to reduce false positives.
+- **Curated, versioned training datasets** drawn from WCC historical records, plus real and synthetic news headlines as negatives, including "hard negatives" (peaceful water news) to reduce false positives.
 - **Reproducible training and evaluation infrastructure** for retraining and tracking model performance over time.
 
 The design is deliberately frugal: rather than relying on a large language model, the task is handled by a small, specialized classifier that is cheap and fast enough to screen text at scale on ordinary hardware. The model is published as **open weights on Hugging Face**, so it remains transparent, auditable, and reusable by the wider research community at no licensing cost.
@@ -26,7 +26,7 @@ In workplan terms, data curation and model development (M3–4 and M4–7) are l
 **2.1 Data & model refinement (M3–7).** Strengthen weaker categories (notably the Weapon label) through targeted data augmentation, add non-English sources, and retrain to agreed performance thresholds. Add calibrated confidence scores to each prediction to drive review routing.
 *Checkpoint C2a — Training Dataset Ready: end of Month 5.*
 
-**2.2 Live ingestion pipeline (M5–8).** Build the layer that pulls open-source text streams and feeds candidate events to the classifier. The primary source will be **GDELT**, using its Global Knowledge Graph themes to pre-filter for water-relevant material before classification — substantially reducing the volume of text that needs to be parsed. GDELT is not entirely free but is queried via Google Cloud at very low cost, and the classifier itself is inexpensive to run since it is a small model rather than a large language model — so running costs stay minimal even at scale. ACLED and other sources will be considered as complementary inputs.
+**2.2 Live ingestion pipeline (M5–8).** Build the layer that pulls open-source text streams and feeds candidate events to the classifier. The primary source will be **GDELT**, using its Global Knowledge Graph themes to pre-filter for water-relevant material before classification — substantially reducing the volume of text that needs to be parsed. GDELT is not entirely free but is queried via Google Cloud at very low cost, and the classifier itself is inexpensive to run since it is a small model rather than a large language model — so running costs stay minimal even at scale. Other open sources will be considered as complementary inputs.
 
 **2.3 Human review & moderation workflow (M5–8).** Build a review queue where every AI-flagged event is confirmed, rejected, or reclassified by an expert before entering the database. High-confidence events are fast-tracked; borderline ones are escalated, with defined turnaround standards and reliability checks.
 
@@ -62,5 +62,5 @@ Currently ~TRL 4 (model validated against held-out historical data). By project 
 | Risk | Mitigation |
 |---|---|
 | Classification accuracy insufficient | Conservative deployment thresholds; human review catches errors; active learning on weak categories |
-| Data source access cost/terms change | Primary source (GDELT) is open and low-cost via Google Cloud; complement with ACLED/others; theme pre-filtering keeps query and compute costs minimal |
+| Data source access cost/terms change | Primary source (GDELT) is open and low-cost via Google Cloud; complement with other open sources; theme pre-filtering keeps query and compute costs minimal |
 | Specialized expertise retention | Fully documented, modular pipeline; cross-train ≥2 team members |

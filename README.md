@@ -154,21 +154,23 @@ waterconflict/
 │
 ├── scripts/            # 🛠️ Utility Scripts (uses published package)
 │   ├── classify.py                   (demo: classify sample headlines)
+│   ├── fetch_serpapi_negatives.py    (real news titles via SerpApi)
+│   ├── generate_synthetic_negatives.py (synthetic headlines via Claude Haiku 5.5)
+│   ├── verify_negatives.py           (LLM judge: drop anything that is water conflict)
+│   ├── build_negatives.py            (dedupe, diversify, hold out → negatives pool)
 │   ├── prepare_training_dataset.py   (prepare & version training data)
 │   ├── train_on_hf.py                (cloud training with HF Jobs)
 │   ├── view_experiments.py           (compare training runs - local)
 │   ├── view_evals.py                 (compare training runs - HF Hub)
 │   └── See scripts/README.md for details
 │
-├── acled/             # 📊 ACLED Data Analysis Tools
-│   └── Conflict data analysis and transforms
-│
 ├── data/              # 📂 Training Data
 │   ├── positives.csv         (water conflict headlines)
-│   ├── negatives.csv         (base ACLED negatives)
-│   ├── negatives_updated.csv (training-ready: ACLED + hard negatives)
+│   ├── real_headlines.csv    (Google News titles)
+│   ├── synthetic_headlines.csv (generated headlines)
 │   ├── hard_negatives.csv    (peaceful water news)
-│   └── ACLED raw data
+│   ├── negatives_updated.csv (training-ready negatives pool)
+│   └── holdout_negatives.csv (real + synthetic negatives never used in training)
 │
 ├── experiment_history.jsonl  # Training history (dataset→model mapping)
 ├── VERSIONING.md             # Dual versioning system docs
@@ -260,18 +262,14 @@ Utility scripts for the complete ML workflow - from data prep to production depl
 
 All scripts use the published [water-conflict-classifier](https://pypi.org/project/water-conflict-classifier/) package. See [scripts/README.md](scripts/README.md) for detailed usage and workflows.
 
-### [ACLED Analysis](acled/)
-Tools for analyzing Armed Conflict Location & Event Data (ACLED) to understand conflict patterns and generate training data.
-
 ## 📚 Data Sources
 
 **Positive Examples:** Pacific Institute Water Conflict Chronology  
 https://www.worldwater.org/water-conflict/
 
-**Negative Examples:** Armed Conflict Location & Event Data Project (ACLED) + synthetic hard negatives  
-https://acleddata.com/
+**Negative Examples:** Real news titles from Google News (via [SerpApi](https://serpapi.com/)) and synthetic headlines generated with Claude Haiku 5.5, each checked by an LLM judge against the water conflict definition
 
-**Hard Negatives:** Synthetic peaceful water-related news to prevent false positives (e.g., water infrastructure projects, research, conservation initiatives)
+**Hard Negatives:** Water-related news that is not conflict (~35% of negatives) to prevent false positives (e.g., utility budgets, flood relief, water research, water sports)
 
 ## License
 
@@ -283,7 +281,7 @@ Licensed under [Creative Commons Attribution-NonCommercial 4.0 International (CC
 
 ## 🌱 Frugal AI Philosophy
 
-This project demonstrates intentional "frugal AI" - using small, efficient models (e.g., ~33M parameters) fine-tuned on limited data (~600 examples) instead of defaulting to massive LLMs (100B+ parameters) for simple classification tasks.
+This project demonstrates intentional "frugal AI" - using small, efficient models (e.g., ~33M parameters) fine-tuned on limited data (~2,000 examples) instead of defaulting to massive LLMs (100B+ parameters) for simple classification tasks.
 
 **Why this matters:** Properly fine-tuned small models can achieve comparable accuracy to trillion-parameter models for targeted tasks, while using a fraction of compute resources and reducing environmental impact.
 

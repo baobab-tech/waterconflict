@@ -165,10 +165,11 @@ Pacific Institute (2025). *Water Conflict Chronology*. Pacific Institute, Oaklan
 https://www.worldwater.org/water-conflict/
 
 ### Negative Examples (Non-Water Conflict Headlines)
-Armed Conflict Location & Event Data Project (ACLED).  
-https://acleddata.com/
+A balanced mix of real and synthetic headlines:
+- **Real**: news titles from Google News topic sections and date-ranged searches (2024-2026), collected via SerpApi
+- **Synthetic**: headlines generated with Claude Haiku 5.5 across topics, countries and headline styles
 
-**Note:** Training negatives include synthetic "hard negatives" - peaceful water-related news (e.g., "New desalination plant opens", "Water conservation conference") to prevent false positives on non-conflict water topics.
+About 35% are "hard negatives": water-related news that is not conflict (e.g., utility budgets, flood relief, water research, water sports) to prevent false positives on non-conflict water topics. Every negative was checked by an LLM judge against the water conflict definition.
 
 ## 🌍 About This Project
 
@@ -249,7 +250,7 @@ If you use this model in your work, please cite:
   author={{Independent Experimental Research Drawing on Pacific Institute Water Conflict Chronology}},
   year={{2025}},
   howpublished={{\url{{https://huggingface.co/{model_repo}}}}},
-  note={{Training data from Pacific Institute Water Conflict Chronology and ACLED}}
+  note={{Training data from Pacific Institute Water Conflict Chronology}}
 }}
 ```
 

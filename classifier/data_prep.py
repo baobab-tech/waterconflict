@@ -55,6 +55,25 @@ def load_training_data_hub(dataset_repo: str) -> tuple[pd.DataFrame, pd.DataFram
     return train_data, test_data
 
 
+def load_holdout_negatives_hub(dataset_repo: str) -> pd.DataFrame | None:
+    """
+    Load held-out negatives (never used in training) from HF Hub, if present.
+    
+    Args:
+        dataset_repo: HF dataset repository ID (e.g. "org/water-conflict-training-data")
+        
+    Returns:
+        DataFrame with 'text' and 'source' columns, or None if the repo has no holdout file
+    """
+    try:
+        path = hf_hub_download(repo_id=dataset_repo, filename="holdout_negatives.csv", repo_type="dataset")
+    except Exception:
+        return None
+    holdout = pd.read_csv(path)
+    print(f"  ✓ Loaded {len(holdout)} held-out negatives")
+    return holdout
+
+
 def load_training_data_local(train_path: str = "../data/train.csv",
                              test_path: str = "../data/test.csv") -> tuple[pd.DataFrame, pd.DataFrame]:
     """

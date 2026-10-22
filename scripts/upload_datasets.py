@@ -2,8 +2,9 @@
 """
 Upload Water Conflict Training Datasets to Hugging Face Hub
 
-This script uploads the positives.csv and negatives.csv files to HF Hub
+This script uploads positives.csv, negatives.csv and holdout_negatives.csv to HF Hub
 so they can be accessed by the training job running on HF infrastructure.
+Build the negatives first with build_negatives.py.
 
 Usage:
     python upload_datasets.py
@@ -72,18 +73,16 @@ def main():
     
     data_dir = Path(__file__).parent.parent / "data"  # scripts/ -> waterconflict/ -> data/
     
-    # Check for negatives_updated.csv (training-ready version with hard negatives)
-    # If it exists, use it. Otherwise fall back to negatives.csv
-    negatives_file = "negatives_updated.csv" if (data_dir / "negatives_updated.csv").exists() else "negatives.csv"
-    
-    if negatives_file == "negatives_updated.csv":
-        print(f"  📊 Using {negatives_file} (includes hard negatives & balanced sampling)")
-    else:
-        print(f"  ⚠️  Using {negatives_file} (run generate_hard_negatives.py to create optimized version)")
+    # negatives_updated.csv is the training-ready pool from build_negatives.py
+    negatives_file = "negatives_updated.csv"
+    if not (data_dir / negatives_file).exists():
+        print(f"  ✗ {negatives_file} not found - run build_negatives.py first")
+        sys.exit(1)
     
     files_to_upload = [
         ("positives.csv", "positives.csv"),
         (negatives_file, "negatives.csv"),  # Always upload as negatives.csv to HF
+        ("holdout_negatives.csv", "holdout_negatives.csv"),
     ]
     
     for local_file, remote_file in files_to_upload:
@@ -98,18 +97,20 @@ def main():
         file_size_mb = local_path.stat().st_size / (1024 * 1024)
         
         # Ensure priority_sample column exists in both files for schema consistency
-        if 'priority_sample' not in df.columns:
+        if local_file == "positives.csv" and 'priority_sample' not in df.columns:
             df['priority_sample'] = False  # All positives are False (not applicable)
             print(f"  Added priority_sample column to {local_file}")
+        if local_file == "positives.csv" and 'source' not in df.columns:
+            df['source'] = "wcc"  # Pacific Institute Water Conflict Chronology
         
         # Show composition for negatives file
         if local_file.startswith("negatives"):
             priority_count = df['priority_sample'].sum()
-            acled_count = len(df) - priority_count
             print(f"  Uploading {local_file} ({file_size_mb:.2f} MB)")
             print(f"    - Total: {len(df)} negatives")
-            print(f"    - Hard negatives (water/peaceful): {int(priority_count)} ({priority_count/len(df)*100:.1f}%)")
-            print(f"    - ACLED negatives (general conflict): {acled_count}")
+            print(f"    - Hard negatives (water-related, not conflict): {int(priority_count)} ({priority_count/len(df)*100:.1f}%)")
+            print(f"    - Other negatives: {len(df) - int(priority_count)}")
+            print(f"    - By source: {df['source'].value_counts().to_dict()}")
         else:
             print(f"  Uploading {local_file} ({file_size_mb:.2f} MB, {len(df)} examples)")
         
@@ -149,6 +150,10 @@ def main():
       "priority_sample": {
         "dtype": "bool",
         "_type": "Value"
+      },
+      "source": {
+        "dtype": "string",
+        "_type": "Value"
       }
     }
   }
@@ -170,6 +175,13 @@ def main():
     
     readme_content = f"""---
 license: mit
+configs:
+- config_name: positives
+  data_files: positives.csv
+- config_name: negatives
+  data_files: negatives.csv
+- config_name: holdout_negatives
+  data_files: holdout_negatives.csv
 task_categories:
 - text-classification
 language:
@@ -191,7 +203,8 @@ This dataset contains labeled examples for training a multi-label water conflict
 ### Files
 
 - `positives.csv`: Water conflict headlines with labels (Trigger, Casualty, Weapon)
-- `negatives.csv`: Non-conflict news headlines (pre-balanced with hard negatives)
+- `negatives.csv`: News headlines that are not water conflict (pre-balanced with hard negatives)
+- `holdout_negatives.csv`: Negatives never used in training, split by source, for checking false positives on real vs synthetic headlines
 
 ### Data Format
 
@@ -201,7 +214,8 @@ Both files have consistent schema:
 |--------|-------------|
 | Headline | News headline text |
 | Basis | For positives: comma-separated labels (Trigger, Casualty, Weapon). For negatives: empty string |
-| priority_sample | Boolean - For negatives: True for hard negatives (water-related peaceful news), False for ACLED. For positives: always False (not applicable) |
+| priority_sample | Boolean - For negatives: True for hard negatives (water-related, not conflict), False otherwise. For positives: always False (not applicable) |
+| source | `wcc` for positives; for negatives `real` (Google News title) or `synthetic` (generated with Claude Haiku 5.5) |
 
 Note: `priority_sample` exists in both files for schema consistency but only has meaning for negatives.
 
@@ -227,17 +241,19 @@ Headline,Basis
 
 ## Hard Negatives & Dataset Balance
 
-The negatives dataset is pre-balanced and training-ready, including:
+The negatives dataset is pre-balanced and training-ready. It matches the positives in size and mixes two sources:
 
-1. **Hard Negatives (~120 examples, ~15-20% of negatives)**: Water-related peaceful news that teaches the model "water ≠ conflict". These prevent false positives where any water mention triggers conflict classification.
-   - Water infrastructure projects (peaceful development)
-   - Water research and technology breakthroughs  
-   - Water conservation initiatives and conferences
-   - Environmental water management topics
+- **Real headlines**: titles from Google News topic sections (US, UK, India, Nigeria editions) and date-ranged searches across 2024-2026, collected via SerpApi. Titles only.
+- **Synthetic headlines**: generated with Claude Haiku 5.5 from a grid of topics, countries and headline styles, using real titles as style examples.
 
-2. **ACLED Negatives (~600 examples)**: General conflict news without water mentions. Sampled from full ACLED dataset for efficient training.
+Composition:
 
-The `priority_sample` column identifies hard negatives (True) vs regular negatives (False). This balanced composition eliminates the need for complex sampling logic during training - the dataset is ready to use as-is
+1. **Hard Negatives (~35% of negatives)**: Water-related news that is not conflict (utilities, infrastructure, floods and droughts as natural events, research, cooperation agreements, water sports, water idioms). These teach the model "water ≠ conflict".
+2. **Other Negatives (~65%)**: Conflict and security news with no water role, plus general news (politics, business, sport, health, science).
+
+Every candidate was labelled by an LLM judge against the water conflict definition; only headlines judged clearly not water conflict are included. Near-duplicates (embedding cosine ≥ 0.85) and headlines too close to any positive were removed, and the pool was selected evenly across topic clusters.
+
+The `priority_sample` column identifies hard negatives (True) vs other negatives (False). This balanced composition eliminates the need for complex sampling logic during training - the dataset is ready to use as-is
 
 ## Usage
 
@@ -249,7 +265,7 @@ dataset = load_dataset("{repo_id}")
 
 ## Citation
 
-If you use this dataset, please cite the original ACLED data source.
+Positive examples come from the Pacific Institute's [Water Conflict Chronology](https://www.worldwater.org/water-conflict/). Please cite it if you use this dataset.
 """
     
     try:

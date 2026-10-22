@@ -118,6 +118,11 @@ def upload_eval_results(
             "f1_samples": convert_value(metrics.get("overall", {}).get("f1_samples")),
             "accuracy": convert_value(metrics.get("overall", {}).get("accuracy")),
             "hamming_loss": convert_value(metrics.get("overall", {}).get("hamming_loss")),
+
+            # False positive rate on held-out negatives (real vs synthetic)
+            "holdout_fpr": convert_value(metrics.get("holdout", {}).get("fpr")),
+            "holdout_fpr_real": convert_value(metrics.get("holdout", {}).get("fpr_real")),
+            "holdout_fpr_synthetic": convert_value(metrics.get("holdout", {}).get("fpr_synthetic")),
         }
         
         # Add per-label metrics (convert numpy types)

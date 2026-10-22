@@ -234,6 +234,20 @@ Evaluated on a held-out test set of {test_size} samples ({test_split*100:.0f}% o
         metrics = per_label[label_name]
         model_card += f"| {label_name} | {metrics['precision']:.4f} | {metrics['recall']:.4f} | {metrics['f1']:.4f} | {metrics['support']} |\n"
     
+    holdout = eval_results.get('holdout')
+    if holdout:
+        model_card += f"""
+### False Positives on Held-Out Negatives
+
+{holdout['n']} negatives never used in training or testing, half real news titles and half synthetic. Share predicted as water conflict (any label):
+
+| Negatives | False Positive Rate |
+|-----------|---------------------|
+| All | {holdout['fpr']:.4f} |
+| Real headlines | {holdout.get('fpr_real', float('nan')):.4f} |
+| Synthetic headlines | {holdout.get('fpr_synthetic', float('nan')):.4f} |
+"""
+    
     model_card += f"""
 ### Training Details
 
@@ -277,10 +291,11 @@ Pacific Institute (2025). *Water Conflict Chronology*. Pacific Institute, Oaklan
 https://www.worldwater.org/water-conflict/
 
 ### Negative Examples (Non-Water Conflict Headlines)
-Armed Conflict Location & Event Data Project (ACLED).  
-https://acleddata.com/
+A balanced mix of real and synthetic headlines:
+- **Real**: news titles from Google News topic sections and date-ranged searches (2024-2026), collected via SerpApi
+- **Synthetic**: headlines generated with Claude Haiku 5.5 across topics, countries and headline styles
 
-**Note:** Training negatives include synthetic "hard negatives" - peaceful water-related news (e.g., "New desalination plant opens", "Water conservation conference") to prevent false positives on non-conflict water topics.
+About 35% are "hard negatives": water-related news that is not conflict (e.g., utility budgets, flood relief, water research, water sports) to prevent false positives on non-conflict water topics. Every negative was checked by an LLM judge against the water conflict definition.
 
 ## 🌍 About This Project
 
@@ -361,7 +376,7 @@ If you use this model in your work, please cite:
   author={{Independent Experimental Research Drawing on Pacific Institute Water Conflict Chronology}},
   year={{2025}},
   howpublished={{\\url{{https://huggingface.co/{model_repo}}}}},
-  note={{Training data from Pacific Institute Water Conflict Chronology and ACLED}}
+  note={{Training data from Pacific Institute Water Conflict Chronology}}
 }}
 ```
 

@@ -56,3 +56,6 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
+# Training outputs
+checkpoints/
+experiment_history.jsonl

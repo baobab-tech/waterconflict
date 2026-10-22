@@ -38,7 +38,7 @@ This classifier demonstrates an intentional approach to building AI systems with
 **Why this matters:** The industry has normalized using trillion-parameter models to classify headlines, answer simple questions, or categorize text - tasks that don't require world knowledge, reasoning, or generative capabilities. This is computationally wasteful and environmentally costly. A properly fine-tuned small model can achieve comparable or better accuracy while using a fraction of the compute resources.
 
 **Our approach:**
-- Train on ~600 examples (few-shot learning with SetFit)
+- Train on ~2,000 examples (few-shot learning with SetFit)
 - Deploy small parameter models (e.g., ~33M params) vs. 100B-1T parameter alternatives
 - Achieve specialized task performance without the overhead of general-purpose LLMs
 - Reduce inference costs and latency by orders of magnitude
@@ -91,10 +91,13 @@ Training data should be in `../data/`:
 - `../data/positives.csv` - Water conflict headlines with labels
 - `../data/negatives.csv` - Non-water conflict headlines
 
-Generate negatives from ACLED (if needed):
+Build negatives (if needed) - see the [scripts README](../scripts/README.md#building-negatives):
 ```bash
 cd ../scripts
-python transform_prep_negatives.py
+python fetch_serpapi_negatives.py
+uv run generate_synthetic_negatives.py --calls 140
+uv run verify_negatives.py ../data/real_headlines.csv ../data/synthetic_headlines.csv ../data/hard_negatives.csv
+uv run build_negatives.py
 ```
 
 3. **Train:**
@@ -133,9 +136,10 @@ See [PUBLISHING.md](PUBLISHING.md) for complete instructions on building and pub
 The training data combines:
 
 - **Positive Examples**: Water conflict headlines from [Pacific Institute Water Conflict Chronology](https://www.worldwater.org/water-conflict/)
-- **Negative Examples**: Two types for balanced training:
-  1. **Hard Negatives (~120)**: Water-related peaceful news (infrastructure, research, conservation) to prevent false positives
-  2. **ACLED Negatives (~600)**: Non-water conflict events from [ACLED](https://acleddata.com/)
+- **Negative Examples**: As many as positives, about half real Google News titles (via SerpApi) and half synthetic headlines generated with Claude Haiku 5.5, all checked by an LLM judge:
+  1. **Hard Negatives (~35%)**: Water-related news that is not conflict (utilities, infrastructure, floods and droughts, research, cooperation, water sports) to prevent false positives
+  2. **Other Negatives (~65%)**: Conflict and security news with no water role, plus general news
+- **Held-out Negatives**: 300 real + 300 synthetic negatives never used in training; the false positive rate on each shows whether the model keys on synthetic style
 
 ### Hard Negatives Strategy
 
@@ -154,7 +158,6 @@ These are tagged with `priority_sample=True` in the dataset and are ALWAYS inclu
 - [UV Script Format](https://docs.astral.sh/uv/guides/scripts/) (used in `train_on_hf.py`)
 - [SetFit Documentation](https://huggingface.co/docs/setfit)
 - [Pacific Institute Water Conflict Chronology](https://www.worldwater.org/water-conflict/)
-- [ACLED Data](https://acleddata.com/)
 
 ---
 

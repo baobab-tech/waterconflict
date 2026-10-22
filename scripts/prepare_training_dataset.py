@@ -6,7 +6,7 @@ This script creates the training-ready dataset from the source data:
 1. Loads raw SOURCE data from HF Hub (positives + negatives with hard negatives)
 2. Preprocesses and balances the data
 3. Splits into train/test sets
-4. Samples to optimal size for SetFit (~1200 examples)
+4. Samples positives per label (~1200 budget) and adds an equal number of negatives
 5. Uploads to TRAINING dataset repo on HF Hub
 6. Creates version tag (d1.0, d1.1, etc.) for tracking
 
@@ -29,8 +29,8 @@ Usage:
     # Specify exact version
     python prepare_training_dataset.py --version d2.0
     
-    # Custom sample size
-    python prepare_training_dataset.py --sample-size 1500
+    # Custom positive sample budget / negative ratio
+    python prepare_training_dataset.py --sample-size 1500 --negative-ratio 1.0
     
     # Skip sampling (use all data)
     python prepare_training_dataset.py --no-sampling
@@ -48,7 +48,7 @@ import numpy as np
 from pathlib import Path
 from sklearn.model_selection import train_test_split
 from skmultilearn.model_selection import iterative_train_test_split
-from huggingface_hub import HfApi, login, create_repo, create_tag
+from huggingface_hub import HfApi, login, create_repo, create_tag, hf_hub_download
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -77,7 +77,8 @@ SOURCE_DATASET_REPO = f"{HF_ORGANIZATION}/{SOURCE_DATASET_REPO_NAME}"
 TRAINING_DATASET_REPO = f"{HF_ORGANIZATION}/{TRAINING_DATASET_REPO_NAME}"
 
 # Training dataset configuration
-DEFAULT_SAMPLE_SIZE = 1200  # Optimal for SetFit
+DEFAULT_SAMPLE_SIZE = 1200  # Positive sample budget, split evenly across labels
+DEFAULT_NEGATIVE_RATIO = 1.0  # Negatives added per sampled positive
 TEST_SIZE = 0.15
 RANDOM_STATE = 42
 
@@ -216,6 +217,7 @@ def create_dataset_version_tag(repo_id: str,
 
 def upload_training_dataset(train_data: pd.DataFrame, 
                             test_data: pd.DataFrame,
+                            holdout_data: pd.DataFrame | None,
                             source_dataset_repo: str,
                             training_dataset_repo: str,
                             config: dict,
@@ -226,6 +228,7 @@ def upload_training_dataset(train_data: pd.DataFrame,
     Args:
         train_data: Training split DataFrame with 'text' and 'labels' columns
         test_data: Test split DataFrame with 'text' and 'labels' columns
+        holdout_data: Held-out negatives with 'text' and 'source' columns (never in train/test), or None
         source_dataset_repo: Source dataset repo (e.g. "org/water-conflict-source-data")
         training_dataset_repo: Training dataset repo (e.g. "org/water-conflict-training-data")
         config: Dict with preparation parameters
@@ -275,6 +278,17 @@ def upload_training_dataset(train_data: pd.DataFrame,
         commit_message=commit_message,
     )
     
+    if holdout_data is not None:
+        holdout_path = "/tmp/holdout_negatives.csv"
+        holdout_data.to_csv(holdout_path, index=False)
+        api.upload_file(
+            path_or_fileobj=holdout_path,
+            path_in_repo="holdout_negatives.csv",
+            repo_id=training_dataset_repo,
+            repo_type="dataset",
+            commit_message=commit_message,
+        )
+    
     print(f"  ✓ Uploaded train.csv ({len(train_data)} examples)")
     print(f"  ✓ Uploaded test.csv ({len(test_data)} examples)")
     
@@ -289,8 +303,15 @@ def upload_training_dataset(train_data: pd.DataFrame,
     
     dataset_card = f"""---
 license: cc-by-nc-4.0
-license_link: https://acleddata.com/eula
-license_name: cc-by-nc-4.0
+configs:
+- config_name: default
+  data_files:
+  - split: train
+    path: train.csv
+  - split: test
+    path: test.csv
+- config_name: holdout
+  data_files: holdout_negatives.csv
 task_categories:
 - text-classification
 language:
@@ -315,7 +336,7 @@ size_categories:
 
 This dataset is designed to assist researchers in training models to classify water-related conflict events at scale. The Pacific Institute maintains the world's most comprehensive open-source record of water-related conflicts, documenting over 2,700 events across 4,500 years of history. 
 
-**⚠️ Non-Commercial Use Only:** This dataset includes data derived from ACLED, which restricts use to non-commercial purposes. Commercial use requires separate permission from ACLED. This is not a commercial product and is not intended for commercial use.
+**⚠️ Non-Commercial Use Only:** This is not a commercial product and is not intended for commercial use.
 
 ## 📋 Dataset Description
 
@@ -326,6 +347,7 @@ This dataset contains **preprocessed, balanced, and split training data** ready 
 - **Source Dataset**: [{source_dataset_repo}](https://huggingface.co/datasets/{source_dataset_repo})
 - **Train Samples**: {len(train_data)}
 - **Test Samples**: {len(test_data)}
+- **Held-out Negatives**: {len(holdout_data) if holdout_data is not None else 0} (`holdout` config: real and synthetic negatives never used in train/test, for checking false positives by source)
 - **Test Split**: {config['test_split']*100:.0f}%
 - **Labels**: {', '.join(LABEL_NAMES)}
 
@@ -334,8 +356,8 @@ This dataset contains **preprocessed, balanced, and split training data** ready 
 This dataset is the **training-ready** version of the source data:
 
 1. ✅ **Preprocessed**: Positives converted to multi-label format, negatives labeled as [0,0,0]
-2. ✅ **Balanced**: Hard negatives (water-related peaceful news) always included, ACLED negatives balanced
-3. ✅ **Sampled**: Reduced to optimal size for SetFit training (~{config.get('sample_size', 'all')} examples)
+2. ✅ **Balanced**: Hard negatives (water-related, not conflict) always included, other negatives balanced to match positives
+3. ✅ **Sampled**: Positives sampled per label (budget {config.get('sample_size', 'all')}), plus negatives at ratio {config.get('negative_ratio', 'n/a')} to sampled positives
 4. ✅ **Split**: Pre-split into train/test sets with stratification
 5. ✅ **Ready to Use**: Load and train directly, no additional preprocessing
 
@@ -414,10 +436,11 @@ Pacific Institute (2025). *Water Conflict Chronology*. Pacific Institute, Oaklan
 https://www.worldwater.org/water-conflict/
 
 ### Negative Examples (Non-Water Conflict Headlines)
-Armed Conflict Location & Event Data Project (ACLED).  
-https://acleddata.com/
+A balanced mix of real and synthetic headlines:
+- **Real**: news titles from Google News topic sections and date-ranged searches (2024-2026), collected via SerpApi. Titles remain the property of their publishers and are included as short headlines for research.
+- **Synthetic**: headlines generated with Claude Haiku 5.5 across topics, countries and headline styles
 
-**Note:** Training negatives include synthetic "hard negatives" - peaceful water-related news (e.g., "New desalination plant opens", "Water conservation conference") to prevent false positives on non-conflict water topics.
+About 35% are "hard negatives": water-related news that is not conflict (e.g., utility budgets, flood relief, water research, water sports) to prevent false positives on non-conflict water topics. Every negative was checked by an LLM judge against the water conflict definition.
 
 ## 🌍 About This Project
 
@@ -431,23 +454,16 @@ This derived training dataset is made available under the [Creative Commons Attr
 
 This dataset is derived from:
 1. **Pacific Institute's Water Conflict Chronology** (positives) - Open-source with attribution requirement
-2. **ACLED data** (negatives) - Subject to [ACLED's Terms of Use](https://acleddata.com/eula)
-
-**ACLED specifically requires:**
-- Non-commercial use only (commercial use requires written permission from ACLED)
-- Proper attribution to ACLED
-- Compliance with their End User License Agreement
+2. **News headlines** (negatives) - Real Google News titles and synthetic headlines
 
 **You are free to:**
 - **Share** — copy and redistribute the material for non-commercial purposes
 - **Adapt** — remix, transform, and build upon the material for non-commercial purposes
 
 **Under the following terms:**
-- **Attribution** — You must credit Baobab Tech, Pacific Institute, and ACLED with appropriate citations
-- **NonCommercial** — You may not use this material for commercial purposes (per ACLED's terms)
-- **Source Compliance** — You must comply with the original licensing terms of Pacific Institute and ACLED data
-
-For commercial use, you must obtain separate permission from ACLED. Contact: https://acleddata.com/
+- **Attribution** — You must credit Baobab Tech and Pacific Institute with appropriate citations
+- **NonCommercial** — You may not use this material for commercial purposes
+- **Source Compliance** — You must comply with the original licensing terms of the Pacific Institute data
 
 ## 📝 Citation
 
@@ -459,7 +475,7 @@ If you use this dataset in your work, please cite:
   author={{Independent Experimental Research Drawing on Pacific Institute Water Conflict Chronology}},
   year={{2025}},
   howpublished={{\\url{{https://huggingface.co/datasets/{training_dataset_repo}}}}},
-  note={{Training data from Pacific Institute Water Conflict Chronology and ACLED}}
+  note={{Training data from Pacific Institute Water Conflict Chronology}}
 }}
 ```
 
@@ -472,18 +488,6 @@ Please also cite the Pacific Institute's Water Conflict Chronology:
   year={{2025}},
   address={{Oakland, CA}},
   url={{https://www.worldwater.org/water-conflict/}},
-  note={{Accessed: [access date]}}
-}}
-```
-
-And ACLED for the negative examples:
-
-```bibtex
-@misc{{acled2025,
-  title={{Armed Conflict Location & Event Data Project}},
-  author={{ACLED}},
-  year={{2025}},
-  url={{https://acleddata.com/}},
   note={{Accessed: [access date]}}
 }}
 ```
@@ -521,7 +525,9 @@ def main():
     
     parser = argparse.ArgumentParser(description="Prepare training-ready dataset from source data")
     parser.add_argument("--sample-size", type=int, default=DEFAULT_SAMPLE_SIZE,
-                       help=f"Number of training samples (default: {DEFAULT_SAMPLE_SIZE})")
+                       help=f"Positive sample budget, split across labels (default: {DEFAULT_SAMPLE_SIZE})")
+    parser.add_argument("--negative-ratio", type=float, default=DEFAULT_NEGATIVE_RATIO,
+                       help=f"Negatives added per sampled positive (default: {DEFAULT_NEGATIVE_RATIO})")
     parser.add_argument("--test-size", type=float, default=TEST_SIZE,
                        help=f"Test set proportion 0-1 (default: {TEST_SIZE})")
     parser.add_argument("--random-state", type=int, default=RANDOM_STATE,
@@ -559,7 +565,17 @@ def main():
     print(f"\n[3/7] Loading source data from HF Hub...")
     print(f"  Source: {SOURCE_DATASET_REPO}")
     positives, negatives = load_source_data_hub(SOURCE_DATASET_REPO)
-    
+
+    # Held-out negatives pass through untouched, for false-positive checks by source
+    holdout_data = None
+    try:
+        holdout_path = hf_hub_download(repo_id=SOURCE_DATASET_REPO, filename="holdout_negatives.csv", repo_type="dataset")
+        holdout = pd.read_csv(holdout_path)
+        holdout_data = pd.DataFrame({'text': holdout['Headline'], 'source': holdout['source']})
+        print(f"  ✓ Loaded {len(holdout_data)} held-out negatives {holdout_data['source'].value_counts().to_dict()}")
+    except Exception as e:
+        print(f"  ⚠ No held-out negatives in source repo ({e})")
+
     # Step 2: Preprocess
     print("\n[4/7] Preprocessing data...")
     print("  - Converting positives to multi-label format")
@@ -631,15 +647,15 @@ def main():
             
             print(f"  - {label_name}: sampled {n_to_sample} from {len(has_label)} available")
         
-        # If we haven't reached target, add random negatives
+        # Add negatives in proportion to the sampled positives
         current_size = len(sampled_indices)
-        if current_size < args.sample_size:
-            remaining = args.sample_size - current_size
+        target_negatives = int(round(current_size * args.negative_ratio))
+        if target_negatives > 0:
             negatives = train_data[train_data['labels'].apply(lambda x: x == [0, 0, 0])]
             available_negatives = negatives[~negatives.index.isin(sampled_indices)]
             
             if len(available_negatives) > 0:
-                n_neg_sample = min(len(available_negatives), remaining)
+                n_neg_sample = min(len(available_negatives), target_negatives)
                 neg_sample = available_negatives.sample(n=n_neg_sample, random_state=args.random_state)
                 sampled_indices.update(neg_sample.index)
                 print(f"  - Negatives: sampled {n_neg_sample} from {len(available_negatives)} available")
@@ -665,6 +681,7 @@ def main():
         "dataset_version": dataset_version,
         "source_repo": SOURCE_DATASET_REPO,
         "sample_size": args.sample_size if not args.no_sampling else "all",
+        "negative_ratio": args.negative_ratio if not args.no_sampling else "n/a",
         "test_split": args.test_size,
         "random_state": args.random_state,
         "train_samples": len(train_data),
@@ -675,6 +692,7 @@ def main():
     training_repo = upload_training_dataset(
         train_data=train_data,
         test_data=test_data,
+        holdout_data=holdout_data,
         source_dataset_repo=SOURCE_DATASET_REPO,
         training_dataset_repo=TRAINING_DATASET_REPO,
         config=config,

@@ -6,7 +6,6 @@ This is a **mono repo** where `/classifier` is the publishable package:
 
 ```
 waterconflict/                    # Mono repo root
-├── acled/                        # ACLED data analysis tools
 ├── data/                         # Training data
 ├── config.py                     # Project config
 ├── classifier/                   # 📦 PACKAGE ROOT (published to PyPI)
@@ -22,13 +21,13 @@ waterconflict/                    # Mono repo root
 │   └── README.md               # Package docs
 └── scripts/                      # Utility scripts (uses published package)
     ├── upload_datasets.py       # Upload training data to HF Hub
-    ├── transform_prep_negatives.py  # Generate negative examples from ACLED
+    ├── build_negatives.py       # Build the negatives pool (dedupe, diversify, hold out)
     └── train_on_hf.py          # HF Jobs training (uses PyPI package)
 ```
 
 **Important:** `/scripts/` folder is separate! It contains utility scripts that **use** the published package:
 - `upload_datasets.py` - Upload training data to HF Hub
-- `transform_prep_negatives.py` - Generate negative examples from ACLED
+- `build_negatives.py` - Build the negatives pool from verified real and synthetic headlines
 - `train_on_hf.py` - Cloud training script (uses `water-conflict-classifier` from PyPI)
 - These are NOT part of the package (and shouldn't be)
 
@@ -185,7 +184,6 @@ If you don't want to publish to PyPI, you can use a Git URL in your UV dependenc
 - `/classifier/` - The package (training code) - **PUBLISH THIS**
 - `/scripts/` - Utility scripts (data prep, upload) - **DON'T PUBLISH**
 - `/data/` - Training data
-- `/acled/` - Analysis tools
 
 **Optional cleanup:**
 If you have an old `/water_conflict_classifier/` folder (duplicate), you can delete it.

@@ -65,6 +65,31 @@ def evaluate_model(model: SetFitModel,
     }
 
 
+def evaluate_holdout_negatives(model: SetFitModel,
+                               texts: list[str],
+                               sources: list[str]) -> dict:
+    """
+    False positive rate on held-out negatives, overall and per source.
+    
+    A gap between real and synthetic false positive rates means the model is
+    keying on headline style rather than content.
+    
+    Args:
+        model: Trained SetFitModel
+        texts: Held-out negative headlines (never seen in training)
+        sources: Source of each headline ('real' or 'synthetic')
+        
+    Returns:
+        Dictionary with 'fpr', 'n' and 'fpr_<source>' for each source
+    """
+    flagged = np.array(model.predict(texts)).any(axis=1)
+    sources = np.array(sources)
+    results = {'fpr': float(flagged.mean()), 'n': len(texts)}
+    for source in np.unique(sources):
+        results[f'fpr_{source}'] = float(flagged[sources == source].mean())
+    return results
+
+
 def print_evaluation_results(results: dict, label_names: list[str] = None):
     """
     Pretty print evaluation results to console.

@@ -7,8 +7,11 @@ Scripts for data preparation, dataset management, cloud training, and experiment
 | Category | Script | Purpose |
 |----------|--------|---------|
 | **🎯 Demo** | `classify.py` | Quick demo of classifier on sample headlines |
-| **📊 Data Prep** | `transform_prep_negatives.py` | Generate ACLED negative examples |
+| **📊 Data Prep** | `fetch_serpapi_negatives.py` | Real news titles via SerpApi |
+| | `generate_synthetic_negatives.py` | Synthetic headlines via Claude Haiku 5.5 |
 | | `generate_hard_negatives.py` | Create peaceful water news (hard negatives) |
+| | `verify_negatives.py` | LLM judge: drop anything that is water conflict |
+| | `build_negatives.py` | Dedupe, diversify, hold out → negatives pool |
 | | `upload_datasets.py` | Upload source data to HF Hub |
 | | `prepare_training_dataset.py` | Create training-ready dataset |
 | **🚀 Training** | `train_on_hf.py` | Train on HF Jobs (cloud GPUs) |
@@ -102,51 +105,71 @@ Creates demo data in `demo_experiment_history.jsonl` to explore the versioning f
 
 ---
 
-### `transform_prep_negatives.py`
-Generate negative examples (non-water conflict headlines) from ACLED data.
+### Building negatives
 
-**Usage:**
+Negatives are news headlines that are not water conflict. They are built in five steps; each step caches its API responses in `../data/` so re-runs only fetch or generate what is missing.
+
+| Step | Script | Output |
+|------|--------|--------|
+| 1. Real titles | `fetch_serpapi_negatives.py` | `real_headlines.csv` |
+| 2. Synthetic titles | `generate_synthetic_negatives.py` | `synthetic_headlines.csv` |
+| 3. Hard negatives | `generate_hard_negatives.py` | `hard_negatives.csv` |
+| 4. LLM judge | `verify_negatives.py` | `*_verified.csv` |
+| 5. Pool | `build_negatives.py` | `negatives_updated.csv`, `holdout_negatives.csv` |
+
+The water conflict definition both LLM steps use lives in `negatives_common.py`.
+
+**Requirements:** `SERPAPI_KEY` and `ANTHROPIC_API_KEY` in the project `.env` (gitignored).
+
+### `fetch_serpapi_negatives.py`
+Collect real news titles from Google News via [SerpApi](https://serpapi.com/google-news-api).
+
 ```bash
-cd scripts
-python transform_prep_negatives.py
+python fetch_serpapi_negatives.py --dry-run   # plan and search cost, no API calls
+python fetch_serpapi_negatives.py             # run the plan
 ```
 
-**What it does:**
-- Loads ACLED raw data from `../data/ACLED RAW_*.csv`
-- Filters out headlines containing "water"
-- Samples 2,500 random headlines
-- Cleans headlines (removes date prefixes)
-- Saves to `../data/negatives.csv`
+- Topic sections (World, Business, Technology, Entertainment, Sports, Science, Health) for the US, UK, India and Nigeria editions: ~200-300 titles per search, all from the past week
+- Date-ranged keyword searches (`after:` / `before:`) spread across 2024-2026: ~100 titles per search
+- One SerpApi search per entry (~51 in total); aborts if a run would leave fewer than 50 searches on the account
+- Water-related titles are kept and marked; the judge decides which are safe
 
-**Requirements:** 
-- ACLED data must be in `../data/` folder
+### `generate_synthetic_negatives.py`
+Generate headlines with Claude Haiku 5.5.
 
-**Note:** This creates the base ACLED negatives pool. Run `generate_hard_negatives.py` after this to create the final training-ready dataset with hard negatives included.
+```bash
+uv run generate_synthetic_negatives.py --calls 140   # ~3,500 headlines
+```
 
----
+- Each call draws a category (conflict without water 40%, water without conflict 30%, general 30%), a subtopic, four countries and a headline style, plus 8 real titles as style examples
+- Calls run in parallel (`--workers`, default 32); throughput is capped by the org's output-token rate limit
 
 ### `generate_hard_negatives.py`
-Generate "hard negatives" - peaceful water-related news to prevent false positives.
+Write 100 hand-written peaceful water headlines to `../data/hard_negatives.csv`.
 
-**Usage:**
+### `verify_negatives.py`
+LLM judge (Claude Haiku 5.5). Labels each headline `water_conflict`, `not_water_conflict` or `unsure`, and whether it is water-related. Only `not_water_conflict` headlines become negatives.
+
 ```bash
-cd scripts
-python generate_hard_negatives.py
+uv run verify_negatives.py ../data/real_headlines.csv ../data/synthetic_headlines.csv ../data/hard_negatives.csv
 ```
 
-**What it does:**
-- Generates ~120 peaceful water-related headlines (infrastructure, research, conservation)
-- Creates `../data/hard_negatives.csv`
-- Merges with ACLED negatives to create training-ready `negatives_updated.csv`
-- Tags hard negatives with `priority_sample=True` to ensure they're always included
-- Samples down ACLED negatives to ~600 (since we don't need all 2500+)
+Any headline with both a water element and violence, protest or threat is never labelled `not_water_conflict`. On a sample of 50 positives, the judge passed none as safe.
 
-**Why needed:** Without hard negatives, the model learns "water = conflict" instead of "water + violence = conflict". Hard negatives teach it to distinguish peaceful water news from actual conflicts.
+### `build_negatives.py`
+Build the training-ready pool.
 
-**Output:** Creates `negatives_updated.csv` with:
-- ALL 120 hard negatives (priority_sample=True)
-- ~600 sampled ACLED negatives (priority_sample=False)
-- Total: ~720 training-ready negatives with ~17% hard negatives
+```bash
+uv run build_negatives.py
+```
+
+1. Keeps `not_water_conflict` headlines
+2. Drops near-duplicates (bge-small embeddings, cosine ≥ 0.85; real titles win ties)
+3. Sets aside headlines too close to any positive (`negatives_review.csv`)
+4. Holds out 300 real + 300 synthetic negatives (`holdout_negatives.csv`), never used in training
+5. Selects as many negatives as positives, 35% water-related, round-robin across k-means topic clusters
+
+**Output:** `negatives_updated.csv` with `Headline`, `Basis`, `priority_sample` (True for water-related hard negatives) and `source` (`real` / `synthetic`).
 
 ---
 
@@ -161,15 +184,15 @@ python upload_datasets.py
 
 **What it does:**
 - Loads `../data/positives.csv`
-- Checks for `../data/negatives_updated.csv` (with hard negatives), falls back to `negatives.csv` if not found
+- Loads `../data/negatives_updated.csv` and `../data/holdout_negatives.csv` (from `build_negatives.py`)
 - Creates/updates HF Hub dataset repository
 - Uploads files to `YOUR_ORG/water-conflict-source-data` (source dataset - raw, unprocessed)
-- Shows dataset composition (hard negatives vs ACLED negatives)
+- Shows dataset composition (hard vs other negatives, real vs synthetic)
 
 **Requirements:**
 - HF authentication: `hf auth login`
 - Config file: Copy `config.sample.py` to `config.py` and set `HF_ORGANIZATION`
-- Training data must be prepared first (run `generate_hard_negatives.py` for best results)
+- Negatives must be built first (see [Building negatives](#building-negatives))
 
 **Note:** This uploads the RAW source data. Run `prepare_training_dataset.py` to create the training-ready dataset.
 
@@ -197,7 +220,8 @@ python prepare_training_dataset.py \
 ```
 
 **Arguments:**
-- `--sample-size N`: Number of training samples (default: 1200, optimal for SetFit)
+- `--sample-size N`: Positive sample budget, split across labels (default: 1200)
+- `--negative-ratio R`: Negatives added per sampled positive (default: 1.0)
 - `--test-size F`: Test set proportion 0-1 (default: 0.15)
 - `--random-state N`: Random seed for reproducibility (default: 42)
 - `--no-sampling`: Use all data without sampling
@@ -206,7 +230,8 @@ python prepare_training_dataset.py \
 - Loads raw SOURCE data from HF Hub (`org/water-conflict-source-data`)
 - Preprocesses: converts to multi-label format, balances hard negatives
 - Splits into train/test sets (default: 85/15 split)
-- Samples to optimal size for SetFit (~1200 examples by default)
+- Samples positives per label (~1,000 from a 1,200 budget), then adds an equal number of negatives (~2,000 examples)
+- Copies `holdout_negatives.csv` from the source repo (used by `train_on_hf.py` to report false positive rates on real vs synthetic negatives)
 - Uploads to `YOUR_ORG/water-conflict-training-data` as training-ready dataset
 
 **Output:** Creates training-ready dataset with:
@@ -262,6 +287,11 @@ MODEL_VERSION=v2.0 hf jobs uv run ... scripts/train_on_hf.py
 - `--secrets HF_TOKEN`: Authentication token
 - `--env HF_ORGANIZATION=yourorg`: Your HF org/username
 - `--namespace yourorg`: Runs job under org account for billing
+- `--env NUM_EPOCHS=2`: Training epochs (default: 1)
+- `--env SAMPLING_STRATEGY=oversampling`: SetFit pair sampling (default: undersampling)
+- `--env PUSH_TO_HUB=false`: Evaluate and log to `experiment_history.jsonl` only, for local sweeps
+
+When the training dataset has `holdout_negatives.csv`, the run also reports the false positive rate on held-out real and synthetic negatives (model card and evals dataset).
 
 **Expected Runtime:** ~2-5 minutes on A10G GPU
 
@@ -447,13 +477,13 @@ Choose your path based on what you want to do:
 ### For Cloud Training (HF Jobs) - RECOMMENDED
 
 ```bash
-# 1. Generate base ACLED negatives (if needed)
+# 1-2. Build negatives (if needed) - see "Building negatives"
 cd scripts
-python transform_prep_negatives.py
-
-# 2. Generate training-ready negatives with hard negatives
+python fetch_serpapi_negatives.py
+uv run generate_synthetic_negatives.py --calls 140
 python generate_hard_negatives.py
-# Answer 'y' when prompted to merge - creates negatives_updated.csv
+uv run verify_negatives.py ../data/real_headlines.csv ../data/synthetic_headlines.csv ../data/hard_negatives.csv
+uv run build_negatives.py
 
 # 3. Configure your HF organization
 cd ..
@@ -463,11 +493,11 @@ cp config.sample.py config.py
 # 4. Upload SOURCE data to HF Hub (raw data for reference)
 cd scripts
 python upload_datasets.py
-# This will use negatives_updated.csv automatically
+# Uploads positives, negatives_updated.csv (as negatives.csv) and holdout_negatives.csv
 
 # 5. Prepare TRAINING dataset (preprocessed, balanced, split, sampled)
 python prepare_training_dataset.py
-# This creates the training-ready dataset with ~1200 samples
+# Samples ~1,000 positives (balanced per label) plus an equal number of negatives
 
 # 6. Run training on HF Jobs
 cd ..
@@ -489,9 +519,9 @@ The training script (step 6) simply loads the TRAINING dataset and trains - no p
 ### For Local Training
 
 ```bash
-# 1. Generate negative examples
+# 1. Build negative examples (see "Building negatives")
 cd scripts
-python transform_prep_negatives.py
+uv run build_negatives.py
 
 # 2. Train locally
 cd ../classifier

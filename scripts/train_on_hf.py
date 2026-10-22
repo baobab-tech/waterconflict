@@ -83,14 +83,14 @@ import numpy as np
 from datasets import Dataset
 from setfit import SetFitModelCardData
 from sklearn.model_selection import train_test_split
-from huggingface_hub import HfApi, login
+from huggingface_hub import HfApi, login, get_token
 import warnings
 warnings.filterwarnings('ignore')
 
 # Import from package modules
-from data_prep import load_training_data_hub, LABEL_NAMES
+from data_prep import load_training_data_hub, load_holdout_negatives_hub, LABEL_NAMES
 from training_logic import train_model
-from evaluation import evaluate_model, print_evaluation_results
+from evaluation import evaluate_model, evaluate_holdout_negatives, print_evaluation_results
 from model_card import generate_model_card
 from versioning import ExperimentTracker, create_hf_version_tag, get_next_version
 from evals_upload import upload_eval_results
@@ -117,9 +117,10 @@ EVALS_REPO = f"{HF_ORGANIZATION}/{EVALS_REPO_NAME}"
 # Training configuration
 BASE_MODEL = "BAAI/bge-small-en-v1.5" # "sentence-transformers/all-MiniLM-L6-v2" #
 BATCH_SIZE = 64 
-NUM_EPOCHS = 1   # SetFit best practice: 3-5 epochs for embedding fine-tuning
+NUM_EPOCHS = int(os.environ.get("NUM_EPOCHS", 1))   # SetFit best practice: 3-5 epochs for embedding fine-tuning
 NUM_ITERATIONS = 20
-SAMPLING_STRATEGY = "undersampling" # "oversampling" or "undersampling"
+SAMPLING_STRATEGY = os.environ.get("SAMPLING_STRATEGY", "undersampling") # "oversampling" or "undersampling"
+PUSH_TO_HUB = os.environ.get("PUSH_TO_HUB", "true").lower() != "false"  # false: evaluate and log locally only
 
 # Versioning configuration
 VERSION = os.environ.get("MODEL_VERSION")  # Optional: set explicit version (e.g., "v1.5")
@@ -137,6 +138,9 @@ def setup_authentication():
     if token:
         print("  ✓ Using HF_TOKEN from environment")
         login(token=token)
+    elif get_token():
+        # Already authenticated via 'hf auth login'
+        print("  ✓ Using cached HF token")
     else:
         print("  ⚠ No HF_TOKEN found, attempting interactive login...")
         try:
@@ -296,6 +300,16 @@ def main():
     
     print_evaluation_results(eval_results, LABEL_NAMES)
     
+    # False positives on held-out negatives (real vs synthetic)
+    holdout = load_holdout_negatives_hub(TRAINING_DATASET_REPO)
+    if holdout is not None:
+        eval_results['holdout'] = evaluate_holdout_negatives(
+            model=model,
+            texts=holdout['text'].tolist(),
+            sources=holdout['source'].tolist()
+        )
+        print(f"  Held-out negatives FPR: {eval_results['holdout']}")
+    
     # Step 5: Generate model card
     print("\n[6/7] Generating model card...")
     
@@ -317,90 +331,87 @@ def main():
     
     print("  ✓ Model card generated")
     
-    # Step 6: Push to Hub
-    print("\n[7/7] Pushing model to Hugging Face Hub...")
-    print(f"  Target repository: {MODEL_REPO}")
+    # Log experiment to local history
+    train_size = len(train_data)
+    test_size = len(test_data)
+    full_train_size = train_size + test_size
+    test_split = test_size / full_train_size if full_train_size > 0 else None
     
-    try:
-        model.push_to_hub(
-            MODEL_REPO,
-            commit_message=f"Training complete - F1: {eval_results['overall']['f1_micro']:.4f}",
-            private=False,
-        )
+    tracker = ExperimentTracker(EXPERIMENT_HISTORY_FILE)
+    experiment = tracker.log_experiment(
+        version=version,
+        config={
+            "base_model": BASE_MODEL,
+            "train_size": train_size,
+            "test_size": test_size,
+            "full_train_size": full_train_size,
+            "batch_size": BATCH_SIZE,
+            "num_epochs": NUM_EPOCHS,
+            "sample_size": train_size,
+            "sampling_strategy": SAMPLING_STRATEGY, # "oversampling" or "undersampling"
+            "num_iterations": NUM_ITERATIONS,
+            "test_split": test_split,
+            "dataset_version": dataset_version,
+            "training_type": "standard",
+        },
+        metrics=eval_results,
+        metadata={
+            "model_repo": MODEL_REPO,
+            "training_dataset_repo": TRAINING_DATASET_REPO,
+            "dataset_version": dataset_version,
+        }
+    )
+    print(f"  ✓ Logged to {EXPERIMENT_HISTORY_FILE}")
+    
+    # Step 6: Push to Hub
+    if not PUSH_TO_HUB:
+        print("\n[7/7] PUSH_TO_HUB=false - skipping upload")
+    else:
+        try:
+            print("\n[7/7] Pushing model to Hugging Face Hub...")
+            print(f"  Target repository: {MODEL_REPO}")
+            model.push_to_hub(
+                MODEL_REPO,
+                commit_message=f"Training complete - F1: {eval_results['overall']['f1_micro']:.4f}",
+                private=False,
+            )
         
-        api = HfApi()
-        api.upload_file(
-            path_or_fileobj=model_card.encode(),
-            path_in_repo="README.md",
-            repo_id=MODEL_REPO,
-            repo_type="model",
-        )
+            api = HfApi()
+            api.upload_file(
+                path_or_fileobj=model_card.encode(),
+                path_in_repo="README.md",
+                repo_id=MODEL_REPO,
+                repo_type="model",
+            )
         
-        print(f"  ✓ Model pushed to: https://huggingface.co/{MODEL_REPO}")
+            print(f"  ✓ Model pushed to: https://huggingface.co/{MODEL_REPO}")
         
-        # Version tagging & experiment tracking
-        print("\n  Logging experiment & creating version tag...")
-        print(f"  Using version: {version}")
+            # Create HF Hub tag
+            print(f"\n  Creating version tag: {version}")
+            create_hf_version_tag(
+                model_repo=MODEL_REPO,
+                version=version,
+                metrics=eval_results,
+                config=experiment['config']
+            )
         
-        # Log experiment to local history
-        tracker = ExperimentTracker(EXPERIMENT_HISTORY_FILE)
+            # Upload evaluation results to HF evals dataset
+            print(f"\n  Uploading evaluation results to HF evals dataset...")
+            upload_eval_results(
+                repo_id=EVALS_REPO,
+                version=version,
+                config=experiment['config'],
+                metrics=eval_results,
+                metadata={
+                    "model_repo": MODEL_REPO,
+                    "dataset_repo": TRAINING_DATASET_REPO,
+                    "dataset_version": dataset_version,
+                }
+            )
         
-        # Calculate fields from loaded data
-        train_size = len(train_data)
-        test_size = len(test_data)
-        full_train_size = train_size + test_size
-        test_split = test_size / full_train_size if full_train_size > 0 else None
-        
-        experiment = tracker.log_experiment(
-            version=version,
-            config={
-                "base_model": BASE_MODEL,
-                "train_size": train_size,
-                "test_size": test_size,
-                "full_train_size": full_train_size,
-                "batch_size": BATCH_SIZE,
-                "num_epochs": NUM_EPOCHS,
-                "sample_size": train_size,
-                "sampling_strategy": SAMPLING_STRATEGY, # "oversampling" or "undersampling"
-                "num_iterations": NUM_ITERATIONS,
-                "test_split": test_split,
-                "dataset_version": dataset_version,
-                "training_type": "standard",
-            },
-            metrics=eval_results,
-            metadata={
-                "model_repo": MODEL_REPO,
-                "training_dataset_repo": TRAINING_DATASET_REPO,
-                "dataset_version": dataset_version,
-            }
-        )
-        print(f"  ✓ Logged to {EXPERIMENT_HISTORY_FILE}")
-        
-        # Create HF Hub tag
-        create_hf_version_tag(
-            model_repo=MODEL_REPO,
-            version=version,
-            metrics=eval_results,
-            config=experiment['config']
-        )
-        
-        # Upload evaluation results to HF evals dataset
-        print(f"\n  Uploading evaluation results to HF evals dataset...")
-        upload_eval_results(
-            repo_id=EVALS_REPO,
-            version=version,
-            config=experiment['config'],
-            metrics=eval_results,
-            metadata={
-                "model_repo": MODEL_REPO,
-                "training_dataset_repo": TRAINING_DATASET_REPO,
-                "dataset_version": dataset_version,
-            }
-        )
-        
-    except Exception as e:
-        print(f"  ✗ Error pushing to Hub: {e}")
-        print("  Model trained successfully but not uploaded.")
+        except Exception as e:
+            print(f"  ✗ Error pushing to Hub: {e}")
+            print("  Model trained successfully but not uploaded.")
     
     # Example predictions
     print("\n" + "=" * 80)
